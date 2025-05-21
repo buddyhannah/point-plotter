@@ -163,6 +163,33 @@ function endDraw(e) {
   e.preventDefault();
 }
 
+
+
+
+
+// Calculate vertex of concave equation
+function findQuadraticVertex(coefficients) {
+  const [a, b, c] = coefficients;
+  const xVertex = -b / (2 * c);
+  const yVertex = a + b * xVertex + c * xVertex * xVertex;
+  return { x: xVertex, y: yVertex };
+}
+
+// Create flipped version of the curve from vertex onward
+function createFlippedCurve(coefficients, vertex) {
+  const flippedPoints = [];
+  const [a, b, c] = coefficients;
+  
+  for (let x = vertex.x; x <= 1.001; x += 0.01) {
+    const originalY = a + b * x + c * x * x;
+    // Flip vertically about the y-value of vertex
+    const flippedY = 2 * vertex.y - originalY;
+    flippedPoints.push({ x, y: flippedY });
+  }
+  
+  return flippedPoints;
+}
+
 function createVandermonde(xValues, degree) {
   return xValues.map(x => {
     const row = [];
@@ -174,7 +201,7 @@ function createVandermonde(xValues, degree) {
 }
 
 
-// Solves for concave regression 
+// Find concave regression 
 function solveConcaveRegression(xValues, yValues) {
   const degree = 2; // Quadratic function
   const A = createVandermonde(xValues, degree);
@@ -212,9 +239,29 @@ function drawConcaveApproximation(coefficients) {
   
   ctx.stroke();
   
-  // Display the equation
-  const equationText = `y = ${coefficients[0].toFixed(3)} + ${coefficients[1].toFixed(3)}x ${coefficients[2].toFixed(3)}x²`;
-  eqnLabel.textContent = equationText;
+
+   // Find vertex and create flipped curve
+   const vertex = findQuadraticVertex(coefficients);
+   const flippedPoints = createFlippedCurve(coefficients, vertex);
+ 
+   // Draw flipped portion
+   ctx.strokeStyle = 'rgba(255, 100, 0, 0.8)'; // Orange
+   ctx.beginPath();
+   
+   // Start at vertex
+   const vertexScreen = transformToCanvas(vertex);
+   ctx.moveTo(vertexScreen.x, vertexScreen.y);
+   
+   // Draw flipped points
+   flippedPoints.forEach(point => {
+     const screen = transformToCanvas(point);
+     ctx.lineTo(screen.x, screen.y);
+   });
+   ctx.stroke();
+
+  // Show equation
+  const equationText = `Concave approximation: y = ${coefficients[0].toFixed(3)} + ${coefficients[1].toFixed(3)}x + ${coefficients[2].toFixed(3)}x²`;
+  document.getElementById('eqnLabel').textContent = equationText;
 }
 
 function finalizeGraph() {
@@ -266,7 +313,7 @@ function finalizeGraph() {
   updateTable();
   
   concaveCoefficients = solveConcaveRegression(xValues, yValues);
-  redrawCanvas(); // Draw original graph first
+  redrawCanvas(); 
   
 }
 
@@ -362,10 +409,6 @@ function redrawCanvas() {
   drawGridLines();
   drawAxes();
 
-  if (concaveCoefficients && !drawing) {
-    drawConcaveApproximation(concaveCoefficients);
-  }
-
   if (drawing) {
     // Blue line during drawing
     if (points.length > 1) {
@@ -383,6 +426,7 @@ function redrawCanvas() {
       ctx.stroke();
     }
   } else {
+
     // Draw final black graph
     if (points.length > 1) {
       // Draw connecting line
@@ -408,9 +452,14 @@ function redrawCanvas() {
         ctx.fill();
       });
     }
+  
   }
 
   drawMouseCoordinates();
+
+  if (concaveCoefficients) {
+    drawConcaveApproximation(concaveCoefficients);
+  }
 }
 
 
