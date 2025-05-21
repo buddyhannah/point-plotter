@@ -33,17 +33,20 @@ function getPos(e) {
   let x, y;
   
   if (e.touches) {
-    x = e.touches[0].clientX - rect.left;
-    y = e.touches[0].clientY - rect.top;
+    // For touch events
+    const touch = e.touches[0];
+    x = touch.clientX - rect.left;
+    y = touch.clientY - rect.top;
   } else {
+    // For mouse events
     x = e.clientX - rect.left;
     y = e.clientY - rect.top;
   }
   
   // Convert to 0-1 range with (0,0) at bottom-left
   return {
-    x: x / canvas.width,
-    y: 1 - (y / canvas.height) 
+    x: Math.max(0, Math.min(1, x / canvas.width)),
+    y: Math.max(0, Math.min(1, 1 - (y / canvas.height)))
   };
 }
 
@@ -54,6 +57,35 @@ function transformToCanvas(point) {
     y: (1 - point.y) * canvas.height // Flip y for canvas drawing
   };
 }
+
+
+// Touch handler functions
+function handleTouchStart(e) {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const mouseEvent = new MouseEvent('mousedown', {
+    clientX: touch.clientX,
+    clientY: touch.clientY
+  });
+  startDraw(mouseEvent);
+}
+
+function handleTouchMove(e) {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const mouseEvent = new MouseEvent('mousemove', {
+    clientX: touch.clientX,
+    clientY: touch.clientY
+  });
+  draw(mouseEvent);
+}
+
+function handleTouchEnd(e) {
+  e.preventDefault();
+  const mouseEvent = new MouseEvent('mouseup', {});
+  endDraw(mouseEvent);
+}
+
 
 function startDraw(e) {
   drawing = true;
@@ -297,8 +329,14 @@ clearBtn.addEventListener('click', () => {
   redrawCanvas();
 });
 
+
+// Touch event listeners
+canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+// Mouse event listeners
 canvas.addEventListener('mousedown', startDraw);
-canvas.addEventListener('mousemove', draw);
 canvas.addEventListener('mouseup', endDraw);
 canvas.addEventListener('mouseleave', (e) => {
   if (drawing) {
@@ -333,6 +371,11 @@ canvas.addEventListener('mousemove', (e) => {
     rawX: pos.x * canvas.width,
     rawY: (1 - pos.y) * canvas.height
   };
+  
+  if (drawing) {
+    draw(e); // Handle actual drawing
+  }
+  
   redrawCanvas();
 });
 

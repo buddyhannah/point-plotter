@@ -73,9 +73,47 @@ body {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
   
+  .controls {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    display: inline-block;
+  }
+    
+  .controls label {
+    margin: 0 15px;
+    font-weight: 500;
+    color: #495057;
+  }
+  
+  input[type="number"] {
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 14px;
+    width: 80px;
+    text-align: center;
+  }
+  
+  input[type="number"]:focus {
+    outline: none;
+    border-color: #2c3e50;
+    box-shadow: 0 0 0 2px rgba(44, 62, 80, 0.2);
+  }
   
   /* Responsive adjustments */
   @media (max-width: 768px) {
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    .controls label {
+      margin: 5px 0;
+    }
     
     canvas {
       width: 95%;
