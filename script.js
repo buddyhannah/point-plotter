@@ -1,4 +1,5 @@
 const canvas = document.getElementById('drawCanvas');
+const eqnLabel = document.getElementById('eqnLabel');
 const ctx = canvas.getContext('2d');
 const tableBody = document.getElementById('pointTableBody');
 
@@ -6,6 +7,7 @@ let currentMousePos = null;
 let drawing = false;
 let points = [];
 let lastPoint = null;
+let concaveCoefficients = null;
 
 // Set canvas size 
 function setCanvasSize() {
@@ -129,6 +131,7 @@ function drawGridLines() {
 function startDraw(e) {
   drawing = true;
   points = []; 
+  concaveCoefficients = null; 
   const pos = getPos(e);
   points.push(pos);
   lastPoint = pos;
@@ -160,11 +163,70 @@ function endDraw(e) {
   e.preventDefault();
 }
 
+function createVandermonde(xValues, degree) {
+  return xValues.map(x => {
+    const row = [];
+    for (let i = 0; i <= degree; i++) {
+      row.push(Math.pow(x, i));
+    }
+    return row;
+  });
+}
+
+
+// Solves for concave regression 
+function solveConcaveRegression(xValues, yValues) {
+  const degree = 2; // Quadratic function
+  const A = createVandermonde(xValues, degree);
+  
+  // Use ordinary least squares
+  const X = math.transpose(A);
+  const XtX = math.multiply(X, A);
+  const Xty = math.multiply(X, yValues);
+  let coefficients = math.multiply(math.inv(XtX), Xty);
+  
+  // Ensure concavity negative second derivative for quadratic
+  if (coefficients[2] > 0) {
+    // If not concave, force second derivative to be small negative
+    coefficients[2] = -0.001;
+  }
+  
+  return coefficients;
+}
+
+// Draws the concave approximation
+function drawConcaveApproximation(coefficients) {
+  ctx.strokeStyle = 'rgba(0, 100, 255, 0.8)'; // Semi-transparent blue
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  
+  for (let x = 0; x <= 1.0001; x += 0.01) {
+    const y = coefficients[0] + coefficients[1]*x + coefficients[2]*x*x;
+    const screen = transformToCanvas({x, y});
+    if (x === 0) {
+      ctx.moveTo(screen.x, screen.y);
+    } else {
+      ctx.lineTo(screen.x, screen.y);
+    }
+  }
+  
+  ctx.stroke();
+  
+  // Display the equation
+  const equationText = `y = ${coefficients[0].toFixed(3)} + ${coefficients[1].toFixed(3)}x ${coefficients[2].toFixed(3)}x²`;
+  eqnLabel.textContent = equationText;
+}
+
 function finalizeGraph() {
   if (points.length === 0) return;
   
-  // Process points to ensure proper x-spacing
+  // Sort points by x-value
   points = [...points].sort((a, b) => a.x - b.x);
+  const xValues = points.map(p => p.x);
+  const yValues = points.map(p => p.y);
+
+
+
   const processedPoints = [];
   const xStep = 0.01;
   let currentX = 0;
@@ -202,7 +264,10 @@ function finalizeGraph() {
   
   points = processedPoints;
   updateTable();
-  redrawCanvas();
+  
+  concaveCoefficients = solveConcaveRegression(xValues, yValues);
+  redrawCanvas(); // Draw original graph first
+  
 }
 
 function updateTable() {
@@ -296,6 +361,10 @@ function redrawCanvas() {
   
   drawGridLines();
   drawAxes();
+
+  if (concaveCoefficients && !drawing) {
+    drawConcaveApproximation(concaveCoefficients);
+  }
 
   if (drawing) {
     // Blue line during drawing
