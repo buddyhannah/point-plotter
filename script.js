@@ -1,7 +1,6 @@
 const canvas = document.getElementById('drawCanvas');
 const ctx = canvas.getContext('2d');
 const tableBody = document.getElementById('pointTableBody');
-const clearBtn = document.getElementById('clearBtn');
 
 let currentMousePos = null;
 let drawing = false;
@@ -87,6 +86,46 @@ function handleTouchEnd(e) {
 }
 
 
+function drawGridLines() {
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)'; // Very light gray
+  ctx.lineWidth = 0.5;
+  
+  // Vertical gridlines every 0.1 units
+  for (let x = 0; x <= 1; x += 0.1) {
+    const pixelX = x * canvas.width;
+    ctx.beginPath();
+    ctx.moveTo(pixelX, 0);
+    ctx.lineTo(pixelX, canvas.height);
+    ctx.stroke();
+  }
+  
+  // Horizontal gridlines every 0.1 units
+  for (let y = 0; y <= 1; y += 0.1) {
+    const pixelY = (1 - y) * canvas.height; 
+    ctx.beginPath();
+    ctx.moveTo(0, pixelY);
+    ctx.lineTo(canvas.width, pixelY);
+    ctx.stroke();
+  }
+  
+  // Slightly darker axes
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+  ctx.lineWidth = 1;
+  
+  // Y-axis left edge
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, canvas.height);
+  ctx.stroke();
+  
+  // X-axis bottom edge
+  ctx.beginPath();
+  ctx.moveTo(0, canvas.height);
+  ctx.lineTo(canvas.width, canvas.height);
+  ctx.stroke();
+}
+
+
 function startDraw(e) {
   drawing = true;
   points = []; 
@@ -125,6 +164,7 @@ function finalizeGraph() {
   if (points.length === 0) return;
   
   // Process points to ensure proper x-spacing
+  points = [...points].sort((a, b) => a.x - b.x);
   const processedPoints = [];
   const xStep = 0.01;
   let currentX = 0;
@@ -174,7 +214,7 @@ function updateTable() {
     const yCell = document.createElement('td');
     
     xCell.textContent = point.x.toFixed(2);
-    yCell.textContent = point.y.toFixed(4);
+    yCell.textContent = point.y.toFixed(2);
     
     row.appendChild(xCell);
     row.appendChild(yCell);
@@ -183,20 +223,6 @@ function updateTable() {
 }
 
 function drawAxes() {
-  ctx.strokeStyle = '#999';
-  ctx.beginPath();
-  
-  // Y Axis (left edge)
-  ctx.moveTo(0, 0);
-  ctx.lineTo(0, canvas.height);
-  
-  // X Axis (bottom edge)
-  ctx.moveTo(0, canvas.height);
-  ctx.lineTo(canvas.width, canvas.height);
-  
-  ctx.stroke();
-  
-  // Draw axis labels
   ctx.fillStyle = '#000';
   ctx.font = '12px Arial';
   ctx.fillText('0', 5, canvas.height - 5);
@@ -231,7 +257,6 @@ function drawMouseCoordinates() {
     offsetY = -10;
   }
   
-  // Additional adjustment when drawing
   if (drawing) {
     offsetX = currentMousePos.rawX < centerX ? 40 : -120;
     offsetY = currentMousePos.rawY < centerY ? 30 : -20;
@@ -259,7 +284,7 @@ function drawMouseCoordinates() {
   // Draw coordinates
   ctx.fillStyle = drawing ? '#1e81b0' : '#000';
   ctx.fillText(
-    `(${currentMousePos.x.toFixed(4)}, ${currentMousePos.y.toFixed(4)})`,
+    `(${currentMousePos.x.toFixed(2)}, ${currentMousePos.y.toFixed(2)})`,
     textX,
     textY
   );
@@ -268,6 +293,8 @@ function drawMouseCoordinates() {
 
 function redrawCanvas() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  drawGridLines();
   drawAxes();
 
   if (drawing) {
@@ -320,15 +347,6 @@ function redrawCanvas() {
 
 // Initialize
 setCanvasSize();
-
-// Event listeners
-clearBtn.addEventListener('click', () => {
-  points = [];
-  tableBody.innerHTML = '';
-  lastPoint = null;
-  redrawCanvas();
-});
-
 
 // Touch event listeners
 canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
