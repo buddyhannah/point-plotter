@@ -214,7 +214,7 @@ function withTimeout(promise, timeoutMs, timeoutMessage = 'Computation timed out
 // Find concave regression 
 function solveConcaveRegression(xValues, yValues) {
   return new Promise((resolve, reject) => {
-  const worker = new Worker('regressionWorker.js');
+  const worker = new Worker('regression-worker.js');
 
 
     const timeoutId = setTimeout(() => {
