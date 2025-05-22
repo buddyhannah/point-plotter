@@ -157,18 +157,20 @@ function draw(e) {
   e.preventDefault();
 }
 
-function endDraw(e) {
+async function endDraw(e) {
   drawing = false;
-  finalizeGraph(); // Process points and generate table
+  await finalizeGraph(); // Process points and generate table
   e.preventDefault();
 }
 
 
-
-
-
 // Calculate vertex of concave equation
 function findQuadraticVertex(coefficients) {
+  if (!coefficients || coefficients.length < 3) {
+    console.error("Invalid coefficients array");
+    return { x: 0, y: 0 }; // Default value
+  }
+
   const [a, b, c] = coefficients;
   const xVertex = -b / (2 * c);
   const yVertex = a + b * xVertex + c * xVertex * xVertex;
@@ -201,28 +203,47 @@ function createVandermonde(xValues, degree) {
 }
 
 
+// Timeout if computation takes too long
+function withTimeout(promise, timeoutMs, timeoutMessage = 'Computation timed out') {
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+  });
+  return Promise.race([promise, timeoutPromise]);
+}
+
 // Find concave regression 
 function solveConcaveRegression(xValues, yValues) {
-  const degree = 2; // Quadratic function
-  const A = createVandermonde(xValues, degree);
-  
-  // Use ordinary least squares
-  const X = math.transpose(A);
-  const XtX = math.multiply(X, A);
-  const Xty = math.multiply(X, yValues);
-  let coefficients = math.multiply(math.inv(XtX), Xty);
-  
-  // Ensure concavity negative second derivative for quadratic
-  if (coefficients[2] > 0) {
-    // If not concave, force second derivative to be small negative
-    coefficients[2] = -0.001;
-  }
-  
-  return coefficients;
+  return new Promise((resolve, reject) => {
+    const worker = new Worker('./regressionWorker.js');
+
+    const timeoutId = setTimeout(() => {
+      worker.terminate();
+      reject(new Error('Computation timed out'));
+    }, 1000);
+
+    worker.onmessage = (e) => {
+      clearTimeout(timeoutId);
+      if (e.data.error) {
+        reject(new Error(e.data.error));
+      } else {
+        resolve(e.data.coefficients);
+      }
+    };
+
+    worker.onerror = (err) => {
+      clearTimeout(timeoutId);
+      reject(err);
+    };
+
+    worker.postMessage({ xValues, yValues });
+  });
 }
+
 
 // Draws the concave approximation
 function drawConcaveApproximation(coefficients) {
+  if (!coefficients) return; // Exit if no coefficients
+
   ctx.strokeStyle = 'rgba(0, 100, 255, 0.8)'; // Semi-transparent blue
   ctx.lineWidth = 3;
   ctx.beginPath();
@@ -261,19 +282,23 @@ function drawConcaveApproximation(coefficients) {
 
   // Show equation
   const equationText = `Concave approximation: y = ${coefficients[0].toFixed(3)} + ${coefficients[1].toFixed(3)}x + ${coefficients[2].toFixed(3)}x²`;
-  document.getElementById('eqnLabel').textContent = equationText;
+  eqnLabel.textContent = equationText;
 }
 
-function finalizeGraph() {
-  if (points.length === 0) return;
+
+async function finalizeGraph() {
+  if (points.length < 3) {
+    eqnLabel.textContent = "Not enough points to compute concave fit";
+    concaveCoefficients = null;
+    redrawCanvas();
+    return;
+  }
   
   // Sort points by x-value
   points = [...points].sort((a, b) => a.x - b.x);
   const xValues = points.map(p => p.x);
   const yValues = points.map(p => p.y);
-
-
-
+  /*
   const processedPoints = [];
   const xStep = 0.01;
   let currentX = 0;
@@ -311,8 +336,16 @@ function finalizeGraph() {
   
   points = processedPoints;
   updateTable();
+  */
+  try {
+    // Add await here to get the actual coefficients
+    concaveCoefficients = await solveConcaveRegression(xValues, yValues);
+  } catch (error) {
+    console.error("Finalization error:", error);
+    eqnLabel.textContent = "Computation failed unexpectedly";
+    concaveCoefficients = null;
+  }
   
-  concaveCoefficients = solveConcaveRegression(xValues, yValues);
   redrawCanvas(); 
   
 }
