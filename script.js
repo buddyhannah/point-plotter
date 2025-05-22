@@ -299,7 +299,7 @@ async function finalizeGraph() {
   points = [...points].sort((a, b) => a.x - b.x);
   const xValues = points.map(p => p.x);
   const yValues = points.map(p => p.y);
-  /*
+  
   const processedPoints = [];
   const xStep = 0.01;
   let currentX = 0;
@@ -337,7 +337,7 @@ async function finalizeGraph() {
   
   points = processedPoints;
   updateTable();
-  */
+  
   try {
     // Add await here to get the actual coefficients
     concaveCoefficients = await solveConcaveRegression(xValues, yValues);
