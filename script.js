@@ -299,30 +299,49 @@ function solveConcaveRegression(xValues, yValues) {
   let bestFit = null;
   let bestPeakIndex = 0;
 
+  // For each 0 <= j <= n
   for (let j = 1; j < n - 1; j++) {
-    // Split into two regions around the peak candidate
+
+    // Split into two regions around j
+      // [0 ... j]
     const leftX = xValues.slice(0, j + 1);
     const leftY = yValues.slice(0, j + 1);
-    const rightX = xValues.slice(j);
-    const rightY = yValues.slice(j);
 
-    // Apply isotonic regression to each left and right sides
+      // [j+1 ... n]
+    const rightX = xValues.slice(j+1);
+    const rightY = yValues.slice(j+1);
+
+    // Apply isotonic regression both the left and right sides
     const leftFitY = isotonicRegression(leftX, leftY, true);   // Increasing
     const rightFitY = isotonicRegression(rightX, rightY, false); // Decreasing
 
-    // Combine fitted values into full y prediction
-    const combinedFitY = [...leftFitY, ...rightFitY.slice(1)]; // avoid double-counting peak
+    // Calculate error
+    const leftError = calculateError(leftFitY, leftY);
+    const rightError = calculateError(rightFitY, rightY);
+    const error = leftError + rightError;
+
+    
+    if (error >= bestError) continue; // Continue if this fit does not give best error
+
+  
+    // Find index of peak
+    const left_j = leftFitY[j]
+    const right_j_plus_1 = rightFitY[0]
+
+    if (left_j >= right_j_plus_1){
+      bestPeakIndex = j
+    }else{
+      bestPeakIndex = j+1
+    }
+
+    // Best fit
+    const combinedFitY = [...leftFitY, ...rightFitY];
     const combinedFit = xValues.map((x, i) => [x, combinedFitY[i]]);
 
-    // Calculate error
-    const error = calculateError(yValues, combinedFitY);
-
-    // Track the fit that gives the smallest error
-    if (error < bestError) {
-      bestError = error;
-      bestFit = combinedFit;
-      bestPeakIndex = j;
-    }
+    bestError = error;
+    bestFit = combinedFit;
+   
+   
   }
 
   return {
