@@ -10,7 +10,16 @@ let points = [];
 let lastPoint = null;
 let concaveCoefficients = null;
 
-
+// for zooming/panning
+let isHandToolActive = false;
+let scale = 1;
+let offsetX = 0;
+let offsetY = 0;
+let isPanning = false;
+let lastPanX = 0;
+let lastPanY = 0;
+const MAX_ZOOM = 5;
+const MIN_ZOOM = 0.5;
 
 // **************************************************
 // Canvas Setup
@@ -41,6 +50,40 @@ function resizeCanvasToMatchDisplaySize() {
   }
 }
 
+
+/*
+  Convert normalized coordinates (0-1 range) to screen pixel coordinates
+*/
+function normalizedToScreen(normX, normY) {
+  return {
+    x: (normX * canvas.width * scale) + offsetX,
+    y: ((1 - normY) * canvas.height * scale) + offsetY
+  };
+}
+
+/*
+  Convert screen pixel coordinates to normalized coordinates (0-1 range)
+*/
+function screenToNormalized(screenX, screenY) {
+  return {
+    x: (screenX - offsetX) / (canvas.width * scale),
+    y: 1 - ((screenY - offsetY) / (canvas.height * scale))
+  };
+}
+
+
+/*
+  Convert normalized coordinates to untransformed canvas coordinates
+  (for drawing operations that need to be transformed)
+*/
+function normalizedToScreen(normX, normY) {
+  return {
+    x: (normX * canvas.width * scale) + offsetX,
+    y: ((1 - normY) * canvas.height * scale) + offsetY
+  };
+}
+
+
 /*
   Converts screen coordinates to normalized canvas coordinates {x,y}
   where  x, y ∈ [0,1] range and (0,0) is the bottom left corner
@@ -51,7 +94,7 @@ function resizeCanvasToMatchDisplaySize() {
   Output: 
   Normalized coordinated of the form {x, y}
 */
-function getPos(e) {
+function transformFromCanvas(e) {
   const rect = canvas.getBoundingClientRect();
   let x, y;
   
@@ -66,11 +109,7 @@ function getPos(e) {
     y = e.clientY - rect.top;
   }
   
-  // Convert to 0-1 range with (0,0) at bottom-left
-  return {
-    x: Math.max(0, Math.min(1, x / canvas.width)),
-    y: Math.max(0, Math.min(1, 1 - (y / canvas.height)))
-  };
+  return screenToNormalized(x, y);
 }
 
 
@@ -85,18 +124,21 @@ function getPos(e) {
   {x, y} - Pixel coordinate
 */
 function transformToCanvas(point) {
-  // Convert 0-1 coordinates to canvas pixels
-  return {
-    x: point.x * canvas.width,
-    y: (1 - point.y) * canvas.height // Flip y to allow for bottom-left origin
-  };
+  return normalizedToScreen(point.x, point.y);
 }
+
+
 
 /*
   Draws 10x10 grid lines on the canvas.
 */ 
 function drawGridLines() {
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)'; // Very light gray
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.translate(offsetX, offsetY);
+  ctx.scale(scale, scale);
+
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
   ctx.lineWidth = 0.5;
   
   // Vertical gridlines every 0.1 units
@@ -110,14 +152,14 @@ function drawGridLines() {
   
   // Horizontal gridlines every 0.1 units
   for (let y = 0; y <= 1; y += 0.1) {
-    const pixelY = (1 - y) * canvas.height; 
+    const pixelY = (1 - y) * canvas.height;
     ctx.beginPath();
     ctx.moveTo(0, pixelY);
     ctx.lineTo(canvas.width, pixelY);
     ctx.stroke();
   }
   
-  // Slightly darker axes
+  // Axes
   ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
   ctx.lineWidth = 1;
   
@@ -132,19 +174,114 @@ function drawGridLines() {
   ctx.moveTo(0, canvas.height);
   ctx.lineTo(canvas.width, canvas.height);
   ctx.stroke();
+  
+  ctx.restore();
 }
+
 
 /*
   Draws 0 at the orgin, and 1 and the ends of the graph
 */
 function drawAxes() {
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  
+  const zeroPos = normalizedToScreen(0, 0);
+  const oneXPos = normalizedToScreen(1, 0);
+  const oneYPos = normalizedToScreen(0, 1);
+  
   ctx.fillStyle = '#000';
   ctx.font = '12px Arial';
-  ctx.fillText('0', 5, canvas.height - 5);
-  ctx.fillText('1', canvas.width - 10, canvas.height - 5);
-  ctx.fillText('1', 5, 15);
+  ctx.fillText('0', zeroPos.x + 5, zeroPos.y - 5);
+  ctx.fillText('1', oneXPos.x - 15, oneXPos.y - 5);
+  ctx.fillText('1', oneYPos.x + 5, oneYPos.y + 15);
+  
+  ctx.restore();
 }
 
+
+
+function toggleHandTool() {
+  isHandToolActive = !isHandToolActive;
+  const handToolBtn = document.getElementById('handTool');
+  handToolBtn.classList.toggle('active', isHandToolActive);
+  
+  if (isHandToolActive) {
+    canvas.style.cursor = 'grab';
+  } else {
+    canvas.style.cursor = 'default';
+    isPanning = false;
+  }
+}
+
+function zoomCanvas(zoomFactor) {
+  // Calculate new scale with constraints
+  const newScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, scale * zoomFactor));
+  
+  // Adjust offsets to zoom toward center
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
+  
+  offsetX = centerX - (centerX - offsetX) * (newScale / scale);
+  offsetY = centerY - (centerY - offsetY) * (newScale / scale);
+  
+  scale = newScale;
+  redrawCanvas();
+}
+
+
+function resetView() {
+  scale = 1;
+  offsetX = 0;
+  offsetY = 0;
+  redrawCanvas();
+}
+
+function handlePanMove(e) {
+  if (!isHandToolActive || !isPanning) return;
+  
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+  
+  // Calculate delta movement in screen coordinates
+  const dx = mouseX - lastPanX;
+  const dy = mouseY - lastPanY;
+  
+  // Apply the delta directly to the offset
+  offsetX += dx;
+  offsetY += dy;
+  
+  // Update last position (in screen coordinates)
+  lastPanX = mouseX;
+  lastPanY = mouseY;
+  
+  redrawCanvas();
+  e.preventDefault();
+}
+
+function handlePanStart(e) {
+  if (!isHandToolActive) return;
+  
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+  
+  // Store both screen coordinates and transformed coordinates
+  lastPanX = mouseX;
+  lastPanY = mouseY;
+  
+  isPanning = true;
+  canvas.style.cursor = 'grabbing';
+  e.preventDefault();
+}
+
+function handlePanEnd() {
+  if (!isHandToolActive) return;
+  
+  isPanning = false;
+  canvas.style.cursor = 'grab';
+}
 
 
 // **************************************************
@@ -161,10 +298,12 @@ function drawAxes() {
   Output: None
 */
 function startDraw(e) {
+  if (isHandToolActive) return; // Don't draw when hand tool is active
+
   drawing = true;
   points = []; 
   concaveCoefficients = null; 
-  const pos = getPos(e);
+  const pos = transformFromCanvas(e);
   points.push(pos);
   redrawCanvas();
   
@@ -178,7 +317,7 @@ function startDraw(e) {
   e - Mouse event
 */
 function draw(e) {
-  const pos = getPos(e);
+  const pos = transformFromCanvas(e);
   
   // Update mouse position
   currentMousePos = {
@@ -188,7 +327,11 @@ function draw(e) {
     rawY: (1 - pos.y) * canvas.height
   };
 
-  if (!drawing) return;
+   if (!drawing || isHandToolActive) { 
+      redrawCanvas();
+      return;
+    }
+    
   
   points.push(pos);
   lastPoint = pos;
@@ -368,29 +511,34 @@ function calculateError(actual, predicted) {
 function drawConcaveApproximation(fitResult) {
   if (!fitResult?.fit) return;
   
-  const peak = fitResult.fit[fitResult.peakIndex];
-  const peakScreen = transformToCanvas({x: peak[0], y: peak[1]});
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   
-  //  Draw the increasing part in blue
+  const peak = fitResult.fit[fitResult.peakIndex];
+  const peakScreen = normalizedToScreen(peak[0], peak[1]);
+  
+  // Draw the increasing part in blue
   ctx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
   ctx.lineWidth = 3;
   ctx.beginPath();
+  
   for (let i = 0; i <= fitResult.peakIndex; i++) {
-      const point = fitResult.fit[i];
-      const screen = transformToCanvas({x: point[0], y: point[1]});
-      if (i === 0) ctx.moveTo(screen.x, screen.y);
-      else ctx.lineTo(screen.x, screen.y);
+    const point = fitResult.fit[i];
+    const screen = normalizedToScreen(point[0], point[1]);
+    if (i === 0) ctx.moveTo(screen.x, screen.y);
+    else ctx.lineTo(screen.x, screen.y);
   }
   ctx.stroke();
   
   // Draw the decreasing part in orange
   ctx.strokeStyle = 'rgba(255, 100, 0, 0.8)';
   ctx.beginPath();
-  ctx.moveTo(peakScreen.x, peakScreen.y); // Start at peak
+  ctx.moveTo(peakScreen.x, peakScreen.y);
+  
   for (let i = fitResult.peakIndex + 1; i < fitResult.fit.length; i++) {
-      const point = fitResult.fit[i];
-      const screen = transformToCanvas({x: point[0], y: point[1]});
-      ctx.lineTo(screen.x, screen.y);
+    const point = fitResult.fit[i];
+    const screen = normalizedToScreen(point[0], point[1]);
+    ctx.lineTo(screen.x, screen.y);
   }
   ctx.stroke();
   
@@ -398,32 +546,30 @@ function drawConcaveApproximation(fitResult) {
   ctx.strokeStyle = 'rgba(0, 200, 100, 0.6)';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(peakScreen.x, peakScreen.y); // Start at peak
+  ctx.moveTo(peakScreen.x, peakScreen.y);
   
-  // Create flipped points
   for (let i = fitResult.peakIndex + 1; i < fitResult.fit.length; i++) {
-      const point = fitResult.fit[i];
-      // Flip vertically about the peak y-value
-      const flippedY = 2 * peak[1] - point[1];
-      const screen = transformToCanvas({x: point[0], y: flippedY});
-      ctx.lineTo(screen.x, screen.y);
+    const point = fitResult.fit[i];
+    const flippedY = 2 * peak[1] - point[1];
+    const screen = normalizedToScreen(point[0], flippedY);
+    ctx.lineTo(screen.x, screen.y);
   }
   ctx.stroke();
   
-  //  Mark the peak point in red
+  // Mark the peak point in red
   ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
   ctx.beginPath();
   ctx.arc(peakScreen.x, peakScreen.y, 5, 0, 2 * Math.PI);
   ctx.fill();
   
-  // Display the equation info
+  ctx.restore();
+  
+  // Update equation label
   const equationText = `Concave Fit | 
-      Peak: (${peak[0].toFixed(3)}, ${peak[1].toFixed(3)}) |
-      Error: ${fitResult.error.toFixed(4)}`;
+    Peak: (${peak[0].toFixed(3)}, ${peak[1].toFixed(3)}) |
+    Error: ${fitResult.error.toFixed(4)}`;
   eqnLabel.textContent = equationText;
 }
-
-
 
 // **************************************************
 //  Data Processing and UI
@@ -537,63 +683,44 @@ function updateTable() {
 function drawMouseCoordinates() {
   if (!currentMousePos) return;
 
-  ctx.fillStyle = drawing ? '#1e81b0' : '#000'; // Blue when drawing, black otherwise
-  ctx.font = '12px Arial';
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   
-  // Determine quadrant and set offsets
-  let offsetX, offsetY;
-  const centerX = canvas.width / 2;
-  const centerY = canvas.height / 2;
+  const screenPos = normalizedToScreen(currentMousePos.x, currentMousePos.y);
   
-  if (currentMousePos.rawX < centerX) {
-    // Left side - place label to the right
-    offsetX = 10;
+  // Determine position for label
+  let labelX, labelY;
+  if (screenPos.x < canvas.width / 2) {
+    labelX = screenPos.x + 10;
   } else {
-    // Right side - place label to the left
-    offsetX = -100;
+    labelX = screenPos.x - 100;
   }
   
-  if (currentMousePos.rawY < centerY) {
-    // Top half - place label below
-    offsetY = 20;
+  if (screenPos.y < canvas.height / 2) {
+    labelY = screenPos.y + 20;
   } else {
-    // Bottom half - place label above
-    offsetY = -10;
+    labelY = screenPos.y - 10;
   }
   
-  if (drawing) {
-    offsetX = currentMousePos.rawX < centerX ? 40 : -120;
-    offsetY = currentMousePos.rawY < centerY ? 30 : -20;
-  }
-  
-  // Ensure coordinates stay visible near edges
-  const textX = Math.max(5, Math.min(
-    currentMousePos.rawX + offsetX, 
-    canvas.width - 100
-  ));
-  const textY = Math.max(15, Math.min(
-    currentMousePos.rawY + offsetY, 
-    canvas.height - 5
-  ));
+  // Ensure label stays within canvas
+  labelX = Math.max(5, Math.min(labelX, canvas.width - 100));
+  labelY = Math.max(15, Math.min(labelY, canvas.height - 5));
   
   // Draw background
   ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-  ctx.fillRect(
-    textX - 2, 
-    textY - 12, 
-    100, 
-    15
-  );
+  ctx.fillRect(labelX - 2, labelY - 12, 100, 15);
   
   // Draw coordinates
   ctx.fillStyle = drawing ? '#1e81b0' : '#000';
+  ctx.font = '12px Arial';
   ctx.fillText(
     `(${currentMousePos.x.toFixed(2)}, ${currentMousePos.y.toFixed(2)})`,
-    textX,
-    textY
+    labelX,
+    labelY
   );
+  
+  ctx.restore();
 }
-
 
 /*
   
@@ -605,68 +732,73 @@ function drawMouseCoordinates() {
 function redrawCanvas() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   
+  // Draw grid and axes (in transformed space)
   drawGridLines();
   drawAxes();
 
-  if (drawing) {
-    // Blue line during drawing
-    if (points.length > 1) {
-      ctx.strokeStyle = '#1e81b0'; // Blue
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      
-      let first = transformToCanvas(points[0]);
-      ctx.moveTo(first.x, first.y);
-      
-      for (let i = 1; i < points.length; i++) {
-        let p = transformToCanvas(points[i]);
-        ctx.lineTo(p.x, p.y);
-      }
-      ctx.stroke();
-    }
+  // Save the untransformed state for drawing elements that shouldn't be transformed
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   
-  } else if (points.length > 1) {
-      // Draw user's sketch
-      ctx.strokeStyle = '#000';
+  if (drawing) {
+    // Draw the current line being drawn
+    if (points.length > 1) {
+      ctx.strokeStyle = '#1e81b0';
       ctx.lineWidth = 2;
       ctx.beginPath();
       
-      let first = transformToCanvas(points[0]);
+      let first = normalizedToScreen(points[0].x, points[0].y);
       ctx.moveTo(first.x, first.y);
       
       for (let i = 1; i < points.length; i++) {
-        let p = transformToCanvas(points[i]);
+        let p = normalizedToScreen(points[i].x, points[i].y);
         ctx.lineTo(p.x, p.y);
       }
       ctx.stroke();
-        // points
-      ctx.fillStyle = '#000';
-      points.forEach(p => {
-        const screen = transformToCanvas(p);
-        ctx.beginPath();
-        ctx.arc(screen.x, screen.y, 3, 0, 2 * Math.PI);
-        ctx.fill();
-      });
-
-      // Draw convcave fit if available
-      if (concaveCoefficients) {
-        if (concaveCoefficients.fit) {
-          drawConcaveApproximation(concaveCoefficients);
-        
-        }
-      }
     }
+  } else if (points.length > 1) {
+    // Draw the final curve
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    
+    let first = normalizedToScreen(points[0].x, points[0].y);
+    ctx.moveTo(first.x, first.y);
+    
+    for (let i = 1; i < points.length; i++) {
+      let p = normalizedToScreen(points[i].x, points[i].y);
+      ctx.lineTo(p.x, p.y);
+    }
+    ctx.stroke();
+    
+    // Draw points
+    ctx.fillStyle = '#000';
+    points.forEach(p => {
+      const screen = normalizedToScreen(p.x, p.y);
+      ctx.beginPath();
+      ctx.arc(screen.x, screen.y, 3, 0, 2 * Math.PI);
+      ctx.fill();
+    });
 
+    // Draw concave fit if available
+    if (concaveCoefficients?.fit) {
+      drawConcaveApproximation(concaveCoefficients);
+    }
+  }
+
+  // Restore the untransformed state
+  ctx.restore();
+  
+  // Draw mouse coordinates (always in screen space)
   drawMouseCoordinates();
-
 }
 
 
 // **************************************************
-// EVENT LISTENERS
+// Event Listeners
 // **************************************************
 
-// Touch events
+// TOUCH EVENTS
 canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
 canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
 canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
@@ -680,31 +812,68 @@ canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
   e - touch event
 */
 function handleTouchStart(e) {
-  e.preventDefault();
-  const touch = e.touches[0];
-  const mouseEvent = new MouseEvent('mousedown', {
-    clientX: touch.clientX,
-    clientY: touch.clientY
-  });
-  startDraw(mouseEvent);
+  if (!isHandToolActive) {
+    // Handle drawing if hand tool is not active
+    const touch = e.touches[0];
+    const mouseEvent = new MouseEvent('mousedown', {
+      clientX: touch.clientX,
+      clientY: touch.clientY
+    });
+    startDraw(mouseEvent);
+  } else {
+    // Handle panning if hand tool is active
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    lastPanX = touch.clientX - rect.left;
+    lastPanY = touch.clientY - rect.top;
+    isPanning = true;
+    e.preventDefault();
+  }
 }
+
 function handleTouchMove(e) {
-  e.preventDefault();
-  const touch = e.touches[0];
-  const mouseEvent = new MouseEvent('mousemove', {
-    clientX: touch.clientX,
-    clientY: touch.clientY
-  });
-  draw(mouseEvent);
+  if (!isHandToolActive || !isPanning) {
+    // Handle drawing if hand tool is not active
+    const touch = e.touches[0];
+    const mouseEvent = new MouseEvent('mousemove', {
+      clientX: touch.clientX,
+      clientY: touch.clientY
+    });
+    draw(mouseEvent);
+  } else {
+    // Handle panning if hand tool is active
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const touchX = touch.clientX - rect.left;
+    const touchY = touch.clientY - rect.top;
+    
+    const dx = touchX - lastPanX;
+    const dy = touchY - lastPanY;
+    
+    offsetX += dx;
+    offsetY += dy;
+    
+    lastPanX = touchX;
+    lastPanY = touchY;
+    
+    redrawCanvas();
+    e.preventDefault();
+  }
 }
+
 function handleTouchEnd(e) {
-  e.preventDefault();
-  const mouseEvent = new MouseEvent('mouseup', {});
-  endDraw(mouseEvent);
+  if (!isHandToolActive) {
+    // Handle drawing if hand tool is not active
+    const mouseEvent = new MouseEvent('mouseup', {});
+    endDraw(mouseEvent);
+  } else {
+    // Handle panning if hand tool is active
+    isPanning = false;
+    e.preventDefault();
+  }
 }
 
-
-// Mouse events
+// MOUSE EVENTS
 canvas.addEventListener('mousedown', startDraw);
 canvas.addEventListener('mouseup', endDraw);
 canvas.addEventListener('mouseleave', (e) => {
@@ -717,7 +886,7 @@ canvas.addEventListener('mouseleave', (e) => {
 });
 
 canvas.addEventListener('mouseenter', (e) => {
-  const pos = getPos(e);
+  const pos = transformFromCanvas(e);
   currentMousePos = {
     x: pos.x,
     y: pos.y,
@@ -728,16 +897,22 @@ canvas.addEventListener('mouseenter', (e) => {
 });
 
 canvas.addEventListener('mousemove', (e) => {
-  const pos = getPos(e);
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+  
+  // Convert to normalized coordinates
+  const pos = screenToNormalized(mouseX, mouseY);
+  
   currentMousePos = {
     x: pos.x,
     y: pos.y,
-    rawX: pos.x * canvas.width,
-    rawY: (1 - pos.y) * canvas.height
+    rawX: mouseX,  // Store screen coordinates
+    rawY: mouseY
   };
   
   if (drawing) {
-    draw(e); // Handle actual drawing
+    draw(e);
   }
   
   redrawCanvas();
@@ -754,6 +929,23 @@ window.addEventListener('resize', () => {
 });
 
 
+// Toolbar buttons
+document.getElementById('handTool').addEventListener('click', toggleHandTool);
+document.getElementById('zoomIn').addEventListener('click', () => zoomCanvas(1.2));
+document.getElementById('zoomOut').addEventListener('click', () => zoomCanvas(0.8));
+document.getElementById('resetView').addEventListener('click', resetView);
+document.getElementById('clearBtn').addEventListener('click', () => {
+  points = [];
+  tableBody.innerHTML = '';
+  lastPoint = null;
+  redrawCanvas();
+});
+
+// Panning handlers
+canvas.addEventListener('mousedown', handlePanStart);
+canvas.addEventListener('mousemove', handlePanMove);
+canvas.addEventListener('mouseup', handlePanEnd);
+canvas.addEventListener('mouseleave', handlePanEnd);
 
 // Initialize
 setCanvasSize();
