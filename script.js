@@ -445,20 +445,16 @@ function finalizeGraph() {
     return;
   }
 
-  
   // Sort points by ascending x-value
   points = [...points].sort((a, b) => a.x - b.x);
-  const xValues = points.map(p => p.x);
-  const yValues = points.map(p => p.y);
-
-
+ 
   const processedPoints = [];
   const xStep = 0.01;
   let currentX = 0;
   let pointIndex = 0;
   
-  // Map drawn points to the 0-1 x-range
-  while (currentX <= 1.0001 && pointIndex < points.length) {
+  // Create interpolated points at regular intervals
+  while (currentX <= 1.001 && pointIndex < points.length) {
     // Find the point closest to currentX
     while (pointIndex < points.length - 1 && 
           points[pointIndex + 1].x < currentX) {
@@ -487,9 +483,14 @@ function finalizeGraph() {
     currentX += xStep;
   }
 
+  // Update points
   points = processedPoints
+
+  const xValues = processedPoints.map(p => p.x);
+  const yValues = processedPoints.map(p => p.y);
   
   try {
+    eqnLabel.textContent = "Computing...";
     const result = solveConcaveRegression(xValues, yValues);
     
     if (!result) {
@@ -499,7 +500,7 @@ function finalizeGraph() {
     
     concaveCoefficients = result;
 
-    updateTable();  // Don't forget to update the table
+    updateTable(); 
     redrawCanvas();
   } catch (error) {
       eqnLabel.textContent = "Error in computation";
