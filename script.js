@@ -1,3 +1,4 @@
+
 const canvas = document.getElementById('drawCanvas');
 const eqnLabel = document.getElementById('eqnLabel');
 const ctx = canvas.getContext('2d');
@@ -9,7 +10,15 @@ let points = [];
 let lastPoint = null;
 let concaveCoefficients = null;
 
-// Set canvas size 
+
+
+// **************************************************
+// Canvas Setup
+// **************************************************
+
+/*
+  Sets the canvas size
+*/
 function setCanvasSize() {
   canvas.style.width = '80vw';
   canvas.style.height = '70vh';
@@ -18,6 +27,9 @@ function setCanvasSize() {
   resizeCanvasToMatchDisplaySize();
 }
 
+/*
+  Matches canvas pixel dimensions to its display size
+*/
 function resizeCanvasToMatchDisplaySize() {
   const displayWidth = canvas.clientWidth;
   const displayHeight = canvas.clientHeight;
@@ -29,6 +41,16 @@ function resizeCanvasToMatchDisplaySize() {
   }
 }
 
+/*
+  Converts screen coordinates to normalized canvas coordinates {x,y}
+  where  x, y ∈ [0,1] range and (0,0) is the bottom left corner
+
+  Input: 
+  e - Mouse/touch event
+
+  Output: 
+  Normalized coordinated of the form {x, y}
+*/
 function getPos(e) {
   const rect = canvas.getBoundingClientRect();
   let x, y;
@@ -51,43 +73,28 @@ function getPos(e) {
   };
 }
 
+
+/*
+  Returns the actual canvas pixel coordinate corresponding 
+  to the normalized coordinate
+
+  Input:
+  {x,y} - Normalized coordinate 
+  
+  Output:
+  {x, y} - Pixel coordinate
+*/
 function transformToCanvas(point) {
   // Convert 0-1 coordinates to canvas pixels
   return {
     x: point.x * canvas.width,
-    y: (1 - point.y) * canvas.height // Flip y for canvas drawing
+    y: (1 - point.y) * canvas.height // Flip y to allow for bottom-left origin
   };
 }
 
-
-// Touch handler functions
-function handleTouchStart(e) {
-  e.preventDefault();
-  const touch = e.touches[0];
-  const mouseEvent = new MouseEvent('mousedown', {
-    clientX: touch.clientX,
-    clientY: touch.clientY
-  });
-  startDraw(mouseEvent);
-}
-
-function handleTouchMove(e) {
-  e.preventDefault();
-  const touch = e.touches[0];
-  const mouseEvent = new MouseEvent('mousemove', {
-    clientX: touch.clientX,
-    clientY: touch.clientY
-  });
-  draw(mouseEvent);
-}
-
-function handleTouchEnd(e) {
-  e.preventDefault();
-  const mouseEvent = new MouseEvent('mouseup', {});
-  endDraw(mouseEvent);
-}
-
-
+/*
+  Draws 10x10 grid lines on the canvas.
+*/ 
 function drawGridLines() {
   ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)'; // Very light gray
   ctx.lineWidth = 0.5;
@@ -127,17 +134,49 @@ function drawGridLines() {
   ctx.stroke();
 }
 
+/*
+  Draws 0 at the orgin, and 1 and the ends of the graph
+*/
+function drawAxes() {
+  ctx.fillStyle = '#000';
+  ctx.font = '12px Arial';
+  ctx.fillText('0', 5, canvas.height - 5);
+  ctx.fillText('1', canvas.width - 10, canvas.height - 5);
+  ctx.fillText('1', 5, 15);
+}
 
+
+
+// **************************************************
+// Handle Drawing
+// **************************************************
+
+
+/*
+  Starts a new drawing, clears points, and stores initial position.
+
+  Input: Mouse 
+  e - Mouse event
+
+  Output: None
+*/
 function startDraw(e) {
   drawing = true;
   points = []; 
   concaveCoefficients = null; 
   const pos = getPos(e);
   points.push(pos);
-  lastPoint = pos;
   redrawCanvas();
+  
   e.preventDefault();
 }
+
+/* 
+  Adds current mouse position to points array during drawing
+  
+  Input: 
+  e - Mouse event
+*/
 function draw(e) {
   const pos = getPos(e);
   
@@ -157,149 +196,243 @@ function draw(e) {
   e.preventDefault();
 }
 
-async function endDraw(e) {
+/*
+  Input: 
+  e - Mouse event 
+
+  Calls methods to process points and and compute the regression.
+*/
+function endDraw(e) {
   drawing = false;
-  await finalizeGraph(); // Process points and generate table
+  finalizeGraph(); // Process points and generate table
   e.preventDefault();
 }
 
 
-// Calculate vertex of concave equation
-function findQuadraticVertex(coefficients) {
-  if (!coefficients || coefficients.length < 3) {
-    console.error("Invalid coefficients array");
-    return { x: 0, y: 0 }; // Default value
-  }
 
-  const [a, b, c] = coefficients;
-  const xVertex = -b / (2 * c);
-  const yVertex = a + b * xVertex + c * xVertex * xVertex;
-  return { x: xVertex, y: yVertex };
-}
+// **************************************************
+// Computing Best Concave Fit
+// **************************************************
 
-// Create flipped version of the curve from vertex onward
-function createFlippedCurve(coefficients, vertex) {
-  const flippedPoints = [];
-  const [a, b, c] = coefficients;
-  
-  for (let x = vertex.x; x <= 1.001; x += 0.01) {
-    const originalY = a + b * x + c * x * x;
-    // Flip vertically about the y-value of vertex
-    const flippedY = 2 * vertex.y - originalY;
-    flippedPoints.push({ x, y: flippedY });
-  }
-  
-  return flippedPoints;
-}
 
-function createVandermonde(xValues, degree) {
-  return xValues.map(x => {
-    const row = [];
-    for (let i = 0; i <= degree; i++) {
-      row.push(Math.pow(x, i));
+/*
+  Given an array of x- and y-values, returns the monotonic
+  (non-decreasing or non-inceasing) array of y-values that best 
+  matches the original function using
+  the PAVA (Pool Adjacent Violators Algorithm) to for isotonic 
+  regression
+ 
+  Input:
+  xVals - array of x-values (in increasing order)
+  yVals - array of y-values
+  increasing - true (default) for increasing regression, false for decreasing
+
+  Output:
+  Array of y-values representing the best monotonic fit
+
+  Time complexity: O(n)
+*/
+function isotonicRegression(xVals, yVals, increasing = true) {
+  const n = yVals.length;
+  const y = yVals.slice();  
+  const x = xVals.slice();  
+  // Compute weights based on spacing between x-values
+  const weights = x.slice(1).map((x1, i) => x1 - x[i]);  
+  weights.unshift(weights[0]); // Assign first weight 
+
+  let values = y.slice();
+  let w = weights.slice();
+  let index = Array.from({ length: n }, (_, i) => [i, i]);
+
+  let i = 0;
+  while (i < values.length - 1) {
+    const violation = increasing ? values[i] > values[i + 1] : values[i] < values[i + 1];
+    if (violation) {
+      // merge the two values by combine their weights
+      // and replacing  both values with the weighted average
+      const wSum = w[i] + w[i + 1];
+      const avg = (w[i] * values[i] + w[i + 1] * values[i + 1]) / wSum;
+      values.splice(i, 2, avg);
+      w.splice(i, 2, wSum);
+      index.splice(i, 2, [index[i][0], index[i + 1][1]]);
+
+      // Step back to check if the new value causes a new violation with the previous one.
+      i = Math.max(0, i - 1);
+    } else {
+      i++;
     }
-    return row;
-  });
+  }
+
+  // Violations fixed
+  // Assign the average value of each block to every original index in that block.
+  const result = new Array(n);
+  for (let j = 0; j < values.length; j++) {
+    for (let k = index[j][0]; k <= index[j][1]; k++) {
+      result[k] = values[j];
+    }
+  }
+
+  return result;
 }
 
 
-// Timeout if computation takes too long
-function withTimeout(promise, timeoutMs, timeoutMessage = 'Computation timed out') {
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
-  });
-  return Promise.race([promise, timeoutPromise]);
-}
+/*
+  Given x- and y-values, returns the best piecewise isotonic regression 
+  that is increasing to a peak, then decreasing. 
 
-// Find concave regression 
+  Input:
+  xVals - array of x-values (in increasing order)
+  yVals - array of y-values
+  
+  Output:
+  - fit: array of [x, fittedY]
+  - peakIndex: index of the peak
+  - error: total squared error of the best fit
+
+  Time complexity: O(n^2)
+*/
 function solveConcaveRegression(xValues, yValues) {
-  return new Promise((resolve, reject) => {
-  const worker = new Worker('regression-worker.js');
+  const n = xValues.length;
+  if (n < 3) return null;
 
+  let bestError = Infinity;
+  let bestFit = null;
+  let bestPeakIndex = 0;
 
-    const timeoutId = setTimeout(() => {
-      worker.terminate();
-      reject(new Error('Computation timed out'));
-    }, 1000);
+  for (let j = 1; j < n - 1; j++) {
+    // Split into two regions around the peak candidate
+    const leftX = xValues.slice(0, j + 1);
+    const leftY = yValues.slice(0, j + 1);
+    const rightX = xValues.slice(j);
+    const rightY = yValues.slice(j);
 
-    worker.onmessage = (e) => {
-      clearTimeout(timeoutId);
-      if (e.data.error) {
-        reject(new Error(e.data.error));
-      } else {
-        resolve(e.data.coefficients);
-      }
-    };
+    // Apply isotonic regression to each left and right sides
+    const leftFitY = isotonicRegression(leftX, leftY, true);   // Increasing
+    const rightFitY = isotonicRegression(rightX, rightY, false); // Decreasing
 
-    worker.onerror = (err) => {
-      clearTimeout(timeoutId);
-      reject(err);
-    };
+    // Combine fitted values into full y prediction
+    const combinedFitY = [...leftFitY, ...rightFitY.slice(1)]; // avoid double-counting peak
+    const combinedFit = xValues.map((x, i) => [x, combinedFitY[i]]);
 
-    worker.postMessage({ xValues, yValues });
-  });
+    // Calculate error
+    const error = calculateError(yValues, combinedFitY);
+
+    // Track the fit that gives the smallest error
+    if (error < bestError) {
+      bestError = error;
+      bestFit = combinedFit;
+      bestPeakIndex = j;
+    }
+  }
+
+  return {
+    fit: bestFit,
+    peakIndex: bestPeakIndex,
+    error: bestError
+  };
+}
+
+/*
+  Helper method for solveConcaveRegression to
+  calculate the squared error between the predicted and actual y-value
+*/
+function calculateError(actual, predicted) {
+  return actual.reduce((sum, y, i) => sum + Math.pow(y - predicted[i], 2), 0);
 }
 
 
-// Draws the concave approximation
-function drawConcaveApproximation(coefficients) {
-  if (!coefficients) return; // Exit if no coefficients
-
-  ctx.strokeStyle = 'rgba(0, 100, 255, 0.8)'; // Semi-transparent blue
+/*
+  Draws the concave approximation with:
+  - The original increasing and decreasing segments
+  - The decreasing segment flipped vertically
+*/
+function drawConcaveApproximation(fitResult) {
+  if (!fitResult?.fit) return;
+  
+  const peak = fitResult.fit[fitResult.peakIndex];
+  const peakScreen = transformToCanvas({x: peak[0], y: peak[1]});
+  
+  //  Draw the increasing part in blue
+  ctx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
   ctx.lineWidth = 3;
   ctx.beginPath();
-  
-  for (let x = 0; x <= 1.0001; x += 0.01) {
-    const y = coefficients[0] + coefficients[1]*x + coefficients[2]*x*x;
-    const screen = transformToCanvas({x, y});
-    if (x === 0) {
-      ctx.moveTo(screen.x, screen.y);
-    } else {
-      ctx.lineTo(screen.x, screen.y);
-    }
+  for (let i = 0; i <= fitResult.peakIndex; i++) {
+      const point = fitResult.fit[i];
+      const screen = transformToCanvas({x: point[0], y: point[1]});
+      if (i === 0) ctx.moveTo(screen.x, screen.y);
+      else ctx.lineTo(screen.x, screen.y);
   }
-  
   ctx.stroke();
   
-
-   // Find vertex and create flipped curve
-   const vertex = findQuadraticVertex(coefficients);
-   const flippedPoints = createFlippedCurve(coefficients, vertex);
- 
-   // Draw flipped portion
-   ctx.strokeStyle = 'rgba(255, 100, 0, 0.8)'; // Orange
-   ctx.beginPath();
-   
-   // Start at vertex
-   const vertexScreen = transformToCanvas(vertex);
-   ctx.moveTo(vertexScreen.x, vertexScreen.y);
-   
-   // Draw flipped points
-   flippedPoints.forEach(point => {
-     const screen = transformToCanvas(point);
-     ctx.lineTo(screen.x, screen.y);
-   });
-   ctx.stroke();
-
-  // Show equation
-  const equationText = `Concave approximation: y = ${coefficients[0].toFixed(3)} + ${coefficients[1].toFixed(3)}x + ${coefficients[2].toFixed(3)}x²`;
+  // Draw the decreasing part in orange
+  ctx.strokeStyle = 'rgba(255, 100, 0, 0.8)';
+  ctx.beginPath();
+  ctx.moveTo(peakScreen.x, peakScreen.y); // Start at peak
+  for (let i = fitResult.peakIndex + 1; i < fitResult.fit.length; i++) {
+      const point = fitResult.fit[i];
+      const screen = transformToCanvas({x: point[0], y: point[1]});
+      ctx.lineTo(screen.x, screen.y);
+  }
+  ctx.stroke();
+  
+  // Draw the decreasing part flipped in green
+  ctx.strokeStyle = 'rgba(0, 200, 100, 0.6)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(peakScreen.x, peakScreen.y); // Start at peak
+  
+  // Create flipped points
+  for (let i = fitResult.peakIndex + 1; i < fitResult.fit.length; i++) {
+      const point = fitResult.fit[i];
+      // Flip vertically about the peak y-value
+      const flippedY = 2 * peak[1] - point[1];
+      const screen = transformToCanvas({x: point[0], y: flippedY});
+      ctx.lineTo(screen.x, screen.y);
+  }
+  ctx.stroke();
+  
+  //  Mark the peak point in red
+  ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+  ctx.beginPath();
+  ctx.arc(peakScreen.x, peakScreen.y, 5, 0, 2 * Math.PI);
+  ctx.fill();
+  
+  // Display the equation info
+  const equationText = `Concave Fit | 
+      Peak: (${peak[0].toFixed(3)}, ${peak[1].toFixed(3)}) |
+      Error: ${fitResult.error.toFixed(4)}`;
   eqnLabel.textContent = equationText;
 }
 
 
-async function finalizeGraph() {
+
+// **************************************************
+//  Data Processing and UI
+// **************************************************
+
+
+/*
+  
+  Processes the drawn points by:
+  - Sorting them by ascending x-value
+  - Generating a set of points at x-intervals of 0.01 (from 0 to 1) using linear interpolation if needed
+  - Calling solveConcaveRegression to compute a concave regression fit from the processed data.
+  - Calling  updateTable and redrawCanvas to update he table and canvas with the results
+
+*/
+function finalizeGraph() {
   if (points.length < 3) {
-    eqnLabel.textContent = "Not enough points to compute concave fit";
-    concaveCoefficients = null;
-    redrawCanvas();
+    eqnLabel.textContent = "Need at least 3 points";
     return;
   }
+
   
-  // Sort points by x-value
+  // Sort points by ascending x-value
   points = [...points].sort((a, b) => a.x - b.x);
   const xValues = points.map(p => p.x);
   const yValues = points.map(p => p.y);
-  
+
+
   const processedPoints = [];
   const xStep = 0.01;
   let currentX = 0;
@@ -309,7 +442,7 @@ async function finalizeGraph() {
   while (currentX <= 1.0001 && pointIndex < points.length) {
     // Find the point closest to currentX
     while (pointIndex < points.length - 1 && 
-           points[pointIndex + 1].x < currentX) {
+          points[pointIndex + 1].x < currentX) {
       pointIndex++;
     }
     
@@ -334,23 +467,31 @@ async function finalizeGraph() {
     
     currentX += xStep;
   }
-  
-  points = processedPoints;
-  updateTable();
+
+  points = processedPoints
   
   try {
-    // Add await here to get the actual coefficients
-    concaveCoefficients = await solveConcaveRegression(xValues, yValues);
-  } catch (error) {
-    console.error("Finalization error:", error);
-    eqnLabel.textContent = "Computation failed unexpectedly";
-    concaveCoefficients = null;
-  }
-  
-  redrawCanvas(); 
-  
-}
+    const result = solveConcaveRegression(xValues, yValues);
+    
+    if (!result) {
+        eqnLabel.textContent = 'Could not compute regression.';
+        return;
+    }
+    
+    concaveCoefficients = result;
 
+    updateTable();  // Don't forget to update the table
+    redrawCanvas();
+  } catch (error) {
+      eqnLabel.textContent = "Error in computation";
+      console.error(error);
+  }
+}
+    
+
+/*
+  Populates the HTML table with point coordinates.
+*/
 function updateTable() {
   tableBody.innerHTML = '';
   
@@ -368,21 +509,18 @@ function updateTable() {
   });
 }
 
-function drawAxes() {
-  ctx.fillStyle = '#000';
-  ctx.font = '12px Arial';
-  ctx.fillText('0', 5, canvas.height - 5);
-  ctx.fillText('1', canvas.width - 10, canvas.height - 5);
-  ctx.fillText('1', 5, 15);
-}
 
+
+/*
+  Draws mouse coordinates onto the canvas.
+*/
 function drawMouseCoordinates() {
   if (!currentMousePos) return;
 
   ctx.fillStyle = drawing ? '#1e81b0' : '#000'; // Blue when drawing, black otherwise
   ctx.font = '12px Arial';
   
-  // Determine quadrant and set appropriate offsets
+  // Determine quadrant and set offsets
   let offsetX, offsetY;
   const centerX = canvas.width / 2;
   const centerY = canvas.height / 2;
@@ -437,6 +575,13 @@ function drawMouseCoordinates() {
 }
 
 
+/*
+  
+  Redraws the canvas, including
+  - Grid, axes, points, current curve.
+  - Mouse coordinates and concave fit (if applicable)
+
+*/
 function redrawCanvas() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   
@@ -459,11 +604,9 @@ function redrawCanvas() {
       }
       ctx.stroke();
     }
-  } else {
-
-    // Draw final black graph
-    if (points.length > 1) {
-      // Draw connecting line
+  
+  } else if (points.length > 1) {
+      // Draw user's sketch
       ctx.strokeStyle = '#000';
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -476,8 +619,7 @@ function redrawCanvas() {
         ctx.lineTo(p.x, p.y);
       }
       ctx.stroke();
-
-      // Draw points
+        // points
       ctx.fillStyle = '#000';
       points.forEach(p => {
         const screen = transformToCanvas(p);
@@ -485,27 +627,64 @@ function redrawCanvas() {
         ctx.arc(screen.x, screen.y, 3, 0, 2 * Math.PI);
         ctx.fill();
       });
+
+      // Draw convcave fit if available
+      if (concaveCoefficients) {
+        if (concaveCoefficients.fit) {
+          drawConcaveApproximation(concaveCoefficients);
+        
+        }
+      }
     }
-  
-  }
 
   drawMouseCoordinates();
 
-  if (concaveCoefficients) {
-    drawConcaveApproximation(concaveCoefficients);
-  }
 }
 
 
-// Initialize
-setCanvasSize();
+// **************************************************
+// EVENT LISTENERS
+// **************************************************
 
-// Touch event listeners
+// Touch events
 canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
 canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
 canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
 
-// Mouse event listeners
+
+/*
+
+  Converts touch event to corresponding mouse event
+  
+  Input: 
+  e - touch event
+*/
+function handleTouchStart(e) {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const mouseEvent = new MouseEvent('mousedown', {
+    clientX: touch.clientX,
+    clientY: touch.clientY
+  });
+  startDraw(mouseEvent);
+}
+function handleTouchMove(e) {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const mouseEvent = new MouseEvent('mousemove', {
+    clientX: touch.clientX,
+    clientY: touch.clientY
+  });
+  draw(mouseEvent);
+}
+function handleTouchEnd(e) {
+  e.preventDefault();
+  const mouseEvent = new MouseEvent('mouseup', {});
+  endDraw(mouseEvent);
+}
+
+
+// Mouse events
 canvas.addEventListener('mousedown', startDraw);
 canvas.addEventListener('mouseup', endDraw);
 canvas.addEventListener('mouseleave', (e) => {
@@ -515,11 +694,6 @@ canvas.addEventListener('mouseleave', (e) => {
     currentMousePos = null;
     redrawCanvas();
   }
-});
-
-
-window.addEventListener('resize', () => {
-  setCanvasSize();
 });
 
 canvas.addEventListener('mouseenter', (e) => {
@@ -553,3 +727,15 @@ canvas.addEventListener('mouseleave', () => {
   currentMousePos = null;
   redrawCanvas();
 });
+
+// Window Resize
+window.addEventListener('resize', () => {
+  setCanvasSize();
+});
+
+
+
+// Initialize
+setCanvasSize();
+
+
