@@ -7,7 +7,7 @@ let currentMousePos = null;
 let drawing = false;
 let points = [];
 let lastPoint = null;
-let concaveScaledPoints = [];
+let concaveScaledPoints = []; // [ { x: x1, y: y1 }, { x: x2, y: y2 }, ... ];
 let concaveCoefficients = null;
 
 // for zooming/panning
@@ -481,6 +481,9 @@ function solveConcaveRegression(xValues, yValues) {
    
   }
 
+  // Find scaled concave fit
+  concaveScaledPoints = scalePeakOne(bestFit, bestPeakIndex).map(([x, y]) => ({ x, y }));
+
   return {
     fit: bestFit,
     peakIndex: bestPeakIndex,
@@ -565,7 +568,7 @@ function drawConcaveApproximation(fitResult) {
   
 
   //  Draw the scaled graph in pink
-  concaveScaledPoints = scalePeakOne(fitResult.fit, fitResult.peakIndex).map(([x, y]) => ({ x, y }));
+  
   ctx.strokeStyle = 'rgba(222, 57, 255, .8)';
   ctx.lineWidth = 3;
   ctx.beginPath();
