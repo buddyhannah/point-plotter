@@ -1,4 +1,3 @@
-
 const canvas = document.getElementById('drawCanvas');
 const eqnLabel = document.getElementById('eqnLabel');
 const ctx = canvas.getContext('2d');
@@ -20,6 +19,12 @@ let lastPanX = 0;
 let lastPanY = 0;
 const MAX_ZOOM = 5;
 const MIN_ZOOM = 0.5;
+
+// for toolbar scrolling
+const toolbar = document.querySelector('.toolbar');
+let isDown = false;
+let startX = 0;
+let scrollLeft = 0;
 
 // **************************************************
 // Canvas Setup
@@ -61,6 +66,7 @@ function normalizedToScreen(normX, normY) {
   };
 }
 
+
 /*
   Convert screen pixel coordinates to normalized coordinates (0-1 range)
 */
@@ -70,19 +76,6 @@ function screenToNormalized(screenX, screenY) {
     y: 1 - ((screenY - offsetY) / (canvas.height * scale))
   };
 }
-
-
-/*
-  Convert normalized coordinates to untransformed canvas coordinates
-  (for drawing operations that need to be transformed)
-*/
-function normalizedToScreen(normX, normY) {
-  return {
-    x: (normX * canvas.width * scale) + offsetX,
-    y: ((1 - normY) * canvas.height * scale) + offsetY
-  };
-}
-
 
 /*
   Converts screen coordinates to normalized canvas coordinates {x,y}
@@ -923,9 +916,30 @@ canvas.addEventListener('mouseleave', () => {
   redrawCanvas();
 });
 
-// Window Resize
-window.addEventListener('resize', () => {
-  setCanvasSize();
+// Toolbar scrolling
+toolbar.addEventListener('mousedown', (e) => {
+  isDown = true;
+  toolbar.style.cursor = 'grabbing';
+  toolbar.style.userSelect = 'none';
+  startX = e.pageX - toolbar.getBoundingClientRect().left;
+  scrollLeft = toolbar.scrollLeft;
+});
+document.addEventListener('mouseup', () => {
+  isDown = false;
+  toolbar.style.cursor = '';
+  toolbar.style.userSelect = '';
+});
+document.addEventListener('mouseleave', () => {
+  isDown = false;
+  toolbar.style.cursor = '';
+  toolbar.style.userSelect = '';
+});
+toolbar.addEventListener('mousemove', (e) => {
+  if (!isDown) return;
+  e.preventDefault();
+  const x = e.pageX - toolbar.getBoundingClientRect().left;
+  const walk = (x - startX) * 2; 
+  toolbar.scrollLeft = scrollLeft - walk;
 });
 
 
@@ -946,6 +960,12 @@ canvas.addEventListener('mousedown', handlePanStart);
 canvas.addEventListener('mousemove', handlePanMove);
 canvas.addEventListener('mouseup', handlePanEnd);
 canvas.addEventListener('mouseleave', handlePanEnd);
+
+// Window Resize
+window.addEventListener('resize', () => {
+  setCanvasSize();
+});
+
 
 // Initialize
 setCanvasSize();
