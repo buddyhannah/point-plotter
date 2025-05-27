@@ -169,7 +169,7 @@ input[type="number"]:focus {
     white-space: nowrap;
     scrollbar-width: none;
     -ms-overflow-style: none;
-    padding: 12px 30px; 
+    padding: 20px 30px; 
     mask-image: linear-gradient(
       to right,
       transparent 0%,
@@ -224,7 +224,6 @@ input[type="number"]:focus {
   }
   
   .toolbar {
-    padding: 18px 25px;
     mask-image: linear-gradient(
       to right,
       transparent 0%,
@@ -241,9 +240,7 @@ input[type="number"]:focus {
     );
   }
 
-  .toolbar button,
-  .toolbar input[type="color"],
-  .toolbar #brushSize {
+  .toolbar button {
     height: 55px;
     font-size: 16px;
     width: 140px;

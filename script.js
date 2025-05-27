@@ -7,6 +7,7 @@ let currentMousePos = null;
 let drawing = false;
 let points = [];
 let lastPoint = null;
+let concaveScaledPoints = [];
 let concaveCoefficients = null;
 
 // for zooming/panning
@@ -487,6 +488,13 @@ function solveConcaveRegression(xValues, yValues) {
   };
 }
 
+/* Scales the points so the peak value is 1 */
+function scalePeakOne(bestFit, peakIndex) {
+  const maxY = bestFit[peakIndex][1]; // Get y-value at peak index
+  if (maxY === 0) return bestFit;     // Avoid division by zero
+  return bestFit.map(([x, y]) => [x, y / maxY]);
+}
+
 /*
   Helper method for solveConcaveRegression to
   calculate the squared error between the predicted and actual y-value
@@ -555,12 +563,34 @@ function drawConcaveApproximation(fitResult) {
   ctx.arc(peakScreen.x, peakScreen.y, 5, 0, 2 * Math.PI);
   ctx.fill();
   
+
+  //  Draw the scaled graph in pink
+  concaveScaledPoints = scalePeakOne(fitResult.fit, fitResult.peakIndex).map(([x, y]) => ({ x, y }));
+  ctx.strokeStyle = 'rgba(222, 57, 255, .8)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (let i = 0; i < concaveScaledPoints.length; i++) {
+  const { x, y } = concaveScaledPoints[i];
+    const screen = normalizedToScreen(x, y);
+    if (i === 0) ctx.moveTo(screen.x, screen.y);
+    else ctx.lineTo(screen.x, screen.y);
+  }
+  ctx.stroke();
+  
+  const scaledPeakScreen = normalizedToScreen(peak[0], 1);
+  ctx.fillStyle = 'rgba(163, 57, 255, 0.58)';
+  ctx.beginPath();
+  ctx.arc(scaledPeakScreen.x, scaledPeakScreen.y, 5, 0, 2 * Math.PI);
+  ctx.fill();
+
+
   ctx.restore();
   
   // Update equation label
   const equationText = `Concave Fit | 
-    Peak: (${peak[0].toFixed(3)}, ${peak[1].toFixed(3)}) |
-    Error: ${fitResult.error.toFixed(4)}`;
+  Peak: (${peak[0].toFixed(3)}, ${peak[1].toFixed(3)}) |
+  Scaled Peak: (${concaveScaledPoints[fitResult.peakIndex].x.toFixed(3)}, ${concaveScaledPoints[fitResult.peakIndex].y.toFixed(3)}) |
+  Error: ${fitResult.error.toFixed(4)}`;
   eqnLabel.textContent = equationText;
 }
 
@@ -654,19 +684,25 @@ function finalizeGraph() {
 function updateTable() {
   tableBody.innerHTML = '';
   
-  points.forEach(point => {
+  points.forEach((point, i) => {
     const row = document.createElement('tr');
     const xCell = document.createElement('td');
     const yCell = document.createElement('td');
+    const yConcaveCell = document.createElement('td');
     
     xCell.textContent = point.x.toFixed(2);
     yCell.textContent = point.y.toFixed(2);
-    
+
+    const scaledY = concaveScaledPoints?.[i]?.y;
+    yConcaveCell.textContent = scaledY !== undefined ? scaledY.toFixed(2) : '';
+
     row.appendChild(xCell);
     row.appendChild(yCell);
+    row.appendChild(yConcaveCell);
     tableBody.appendChild(row);
   });
 }
+
 
 
 
