@@ -244,7 +244,7 @@ input[type="number"]:focus {
   .toolbar input[type="color"],
   .toolbar #brushSize {
     flex: 0 0 auto;
-    width: 100px;
+    width: 150px;
     height: 55px;
     display: inline-flex;
     align-items: center;

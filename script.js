@@ -7,8 +7,9 @@ let currentMousePos = null;
 let drawing = false;
 let points = [];
 let lastPoint = null;
-let concaveScaledPoints = []; // [ { x: x1, y: y1 }, { x: x2, y: y2 }, ... ];
-let concaveCoefficients = null;
+let convexScaledPoints = []; // [ { x: x1, y: y1 }, { x: x2, y: y2 }, ... ];
+let convexPeakIdx = -1
+let convexPoints = null;
 
 // for zooming/panning
 let isHandToolActive = false;
@@ -27,6 +28,11 @@ let isDown = false;
 let startX = 0;
 let scrollLeft = 0;
 
+
+// For setting range of y-value
+const X_SCALE_FACTOR = 1.5
+const Y_SCALE_FACTOR = 2;
+
 // **************************************************
 // Canvas Setup
 // **************************************************
@@ -36,7 +42,7 @@ let scrollLeft = 0;
 */
 function setCanvasSize() {
   canvas.style.width = '80vw';
-  canvas.style.height = '70vh';
+  canvas.style.height = '80vh';
   canvas.style.maxWidth = 'none';
   canvas.style.maxHeight = 'none';
   resizeCanvasToMatchDisplaySize();
@@ -62,8 +68,8 @@ function resizeCanvasToMatchDisplaySize() {
 */
 function normalizedToScreen(normX, normY) {
   return {
-    x: (normX * canvas.width * scale) + offsetX,
-    y: ((1 - normY) * canvas.height * scale) + offsetY
+    x: (normX/X_SCALE_FACTOR * canvas.width * scale) + offsetX,
+    y: ((1 - normY/Y_SCALE_FACTOR) * canvas.height * scale) + offsetY
   };
 }
 
@@ -73,8 +79,8 @@ function normalizedToScreen(normX, normY) {
 */
 function screenToNormalized(screenX, screenY) {
   return {
-    x: (screenX - offsetX) / (canvas.width * scale),
-    y: 1 - ((screenY - offsetY) / (canvas.height * scale))
+    x: ((screenX - offsetX) / (canvas.width * scale)) * X_SCALE_FACTOR,
+    y: (1 - ((screenY - offsetY) / (canvas.height * scale))) * Y_SCALE_FACTOR
   };
 }
 
@@ -136,8 +142,8 @@ function drawGridLines() {
   ctx.lineWidth = 0.5;
   
   // Vertical gridlines every 0.1 units
-  for (let x = 0; x <= 1; x += 0.1) {
-    const pixelX = x * canvas.width;
+  for (let x = 0; x <= X_SCALE_FACTOR; x += 0.1) {
+    const pixelX = x/X_SCALE_FACTOR * canvas.width;
     ctx.beginPath();
     ctx.moveTo(pixelX, 0);
     ctx.lineTo(pixelX, canvas.height);
@@ -145,8 +151,8 @@ function drawGridLines() {
   }
   
   // Horizontal gridlines every 0.1 units
-  for (let y = 0; y <= 1; y += 0.1) {
-    const pixelY = (1 - y) * canvas.height;
+  for (let y = 0; y <= Y_SCALE_FACTOR; y += 0.1) {
+    const pixelY = (1 - y/Y_SCALE_FACTOR) * canvas.height;
     ctx.beginPath();
     ctx.moveTo(0, pixelY);
     ctx.lineTo(canvas.width, pixelY);
@@ -184,11 +190,22 @@ function drawAxes() {
   const oneXPos = normalizedToScreen(1, 0);
   const oneYPos = normalizedToScreen(0, 1);
   
+  const twoXPos = normalizedToScreen(X_SCALE_FACTOR, 0);
+  const twoYPos = normalizedToScreen(0, Y_SCALE_FACTOR);
+  
   ctx.fillStyle = '#000';
   ctx.font = '12px Arial';
   ctx.fillText('0', zeroPos.x + 5, zeroPos.y - 5);
   ctx.fillText('1', oneXPos.x - 15, oneXPos.y - 5);
   ctx.fillText('1', oneYPos.x + 5, oneYPos.y + 15);
+
+
+  if (X_SCALE_FACTOR != 1){
+    ctx.fillText(X_SCALE_FACTOR, twoXPos.x - 25, twoXPos.y - 5);
+  }
+  if (Y_SCALE_FACTOR != 1){
+    ctx.fillText(Y_SCALE_FACTOR, twoYPos.x + 5, twoYPos.y + 15);
+  }
   
   ctx.restore();
 }
@@ -296,7 +313,7 @@ function startDraw(e) {
 
   drawing = true;
   points = []; 
-  concaveCoefficients = null; 
+  convexPoints = null; 
   const pos = transformFromCanvas(e);
   points.push(pos);
   redrawCanvas();
@@ -348,7 +365,7 @@ function endDraw(e) {
 
 
 // **************************************************
-// Computing Best Concave Fit
+// Computing Best Convex Fit
 // **************************************************
 
 
@@ -428,7 +445,7 @@ function isotonicRegression(xVals, yVals, increasing = true) {
 
   Time complexity: O(n^2)
 */
-function solveConcaveRegression(xValues, yValues) {
+function solveConvexRegression(xValues, yValues) {
   const n = xValues.length;
   if (n < 3) return null;
 
@@ -481,8 +498,9 @@ function solveConcaveRegression(xValues, yValues) {
    
   }
 
-  // Find scaled concave fit
-  concaveScaledPoints = scalePeakOne(bestFit, bestPeakIndex).map(([x, y]) => ({ x, y }));
+  // Find scaled convex fit
+  convexPeakIdx = bestPeakIndex
+  convexScaledPoints = scalePeakOne(bestFit, bestPeakIndex).map(([x, y]) => ({ x, y }));
 
   return {
     fit: bestFit,
@@ -498,8 +516,43 @@ function scalePeakOne(bestFit, peakIndex) {
   return bestFit.map(([x, y]) => [x, y / maxY]);
 }
 
+/**
+ * Flips the increasing part of convex scaled points vertically around the peak
+ * while keeping the decreasing part unchanged
+ * @param {Array} convexScaledPoints - Array of {x, y} points (peak scaled to 1)
+ * @param {number} peakIndex - Index of the peak point
+ * @returns {Array} Array of {x, y} points with increasing part flipped
+ */
+function flipIncreasingPart() {
+  const peakY = convexScaledPoints[convexPeakIdx].y;
+  return convexScaledPoints.map((point, i) => {
+    let myPoint = {...point}
+
+    if (i <= convexPeakIdx) {
+      // Flip increasing part around peak (y = 1)
+      myPoint.y = 2 * peakY - myPoint.y;
+    
+    }
+    // Keep decreasing part as is
+    return myPoint
+  });
+}
+
+/**
+ * Flips the entire graph vertically by calculating 2 - x for each point
+ * @param {Array} points - Array of {x, y} points
+ * @returns {Array} Horizontally flipped array of {x, y} points
+ */
+function flipVertically(points) {
+  return points.map(point => ({
+    x: point.x,
+    y: 2 - point.y
+  }));
+}
+
+
 /*
-  Helper method for solveConcaveRegression to
+  Helper method for solveonvexRegression to
   calculate the squared error between the predicted and actual y-value
 */
 function calculateError(actual, predicted) {
@@ -508,11 +561,11 @@ function calculateError(actual, predicted) {
 
 
 /*
-  Draws the concave approximation with:
+  Draws the convex approximation with:
   - The original increasing and decreasing segments
   - The decreasing segment flipped vertically
 */
-function drawConcaveApproximation(fitResult) {
+function drawConvexApproximation(fitResult) {
   if (!fitResult?.fit) return;
   
   ctx.save();
@@ -546,20 +599,6 @@ function drawConcaveApproximation(fitResult) {
   }
   ctx.stroke();
   
-  // Draw the decreasing part flipped in green
-  ctx.strokeStyle = 'rgba(0, 200, 100, 0.6)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(peakScreen.x, peakScreen.y);
-  
-  for (let i = fitResult.peakIndex + 1; i < fitResult.fit.length; i++) {
-    const point = fitResult.fit[i];
-    const flippedY = 2 * peak[1] - point[1];
-    const screen = normalizedToScreen(point[0], flippedY);
-    ctx.lineTo(screen.x, screen.y);
-  }
-  ctx.stroke();
-  
   // Mark the peak point in red
   ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
   ctx.beginPath();
@@ -568,31 +607,57 @@ function drawConcaveApproximation(fitResult) {
   
 
   //  Draw the scaled graph in pink
-  
-  ctx.strokeStyle = 'rgba(222, 57, 255, .8)';
+  /*
+  ctx.strokeStyle = 'rgba(163, 18, 203, 0.8)';
   ctx.lineWidth = 3;
   ctx.beginPath();
-  for (let i = 0; i < concaveScaledPoints.length; i++) {
-  const { x, y } = concaveScaledPoints[i];
+  for (let i = 0; i < convexScaledPoints.length; i++) {
+  const { x, y } = convexScaledPoints[i];
     const screen = normalizedToScreen(x, y);
     if (i === 0) ctx.moveTo(screen.x, screen.y);
     else ctx.lineTo(screen.x, screen.y);
   }
   ctx.stroke();
+  */
+ 
+  // Draw the flipped increasing part of the scaled graph in green
+  // to create decreasing graph
+  const flippedIncreasing = flipIncreasingPart();
+  ctx.strokeStyle = 'rgba(255, 100, 0, 0.8)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  flippedIncreasing.forEach((point, i) => {
+    const screen = normalizedToScreen(point.x, point.y);
+    if (i === 0) ctx.moveTo(screen.x, screen.y);
+    else ctx.lineTo(screen.x, screen.y);
+  });
+  ctx.stroke();
+
+  // Draw 'unflipped' increasing
+  const flippedVert = flipVertically(flippedIncreasing)
+  ctx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  flippedVert.forEach((point, i) => {
+    const screen = normalizedToScreen(point.x, point.y);
+    if (i === 0) ctx.moveTo(screen.x, screen.y);
+    else ctx.lineTo(screen.x, screen.y);
+  });
+  ctx.stroke();
   
+  // Draw the peak scaled
   const scaledPeakScreen = normalizedToScreen(peak[0], 1);
-  ctx.fillStyle = 'rgba(163, 57, 255, 0.58)';
+  ctx.fillStyle = 'rgba(163, 57, 255, 1)';
   ctx.beginPath();
   ctx.arc(scaledPeakScreen.x, scaledPeakScreen.y, 5, 0, 2 * Math.PI);
   ctx.fill();
 
-
   ctx.restore();
   
   // Update equation label
-  const equationText = `Concave Fit | 
+  const equationText = `Convex Fit | 
   Peak: (${peak[0].toFixed(3)}, ${peak[1].toFixed(3)}) |
-  Scaled Peak: (${concaveScaledPoints[fitResult.peakIndex].x.toFixed(3)}, ${concaveScaledPoints[fitResult.peakIndex].y.toFixed(3)}) |
+  Scaled Peak: (${convexScaledPoints[fitResult.peakIndex].x.toFixed(3)}, ${convexScaledPoints[fitResult.peakIndex].y.toFixed(3)}) |
   Error: ${fitResult.error.toFixed(4)}`;
   eqnLabel.textContent = equationText;
 }
@@ -607,7 +672,7 @@ function drawConcaveApproximation(fitResult) {
   Processes the drawn points by:
   - Sorting them by ascending x-value
   - Generating a set of points at x-intervals of 0.01 (from 0 to 1) using linear interpolation if needed
-  - Calling solveConcaveRegression to compute a concave regression fit from the processed data.
+  - Calling solveConvexRegression to compute a convex regression fit from the processed data.
   - Calling  updateTable and redrawCanvas to update he table and canvas with the results
 
 */
@@ -663,14 +728,14 @@ function finalizeGraph() {
   
   try {
     eqnLabel.textContent = "Computing...";
-    const result = solveConcaveRegression(xValues, yValues);
+    const result = solveConvexRegression(xValues, yValues);
     
     if (!result) {
         eqnLabel.textContent = 'Could not compute regression.';
         return;
     }
     
-    concaveCoefficients = result;
+    convexPoints = result;
 
     updateTable(); 
     redrawCanvas();
@@ -691,17 +756,17 @@ function updateTable() {
     const row = document.createElement('tr');
     const xCell = document.createElement('td');
     const yCell = document.createElement('td');
-    const yConcaveCell = document.createElement('td');
+    const yConvexCell = document.createElement('td');
     
     xCell.textContent = point.x.toFixed(2);
     yCell.textContent = point.y.toFixed(2);
 
-    const scaledY = concaveScaledPoints?.[i]?.y;
-    yConcaveCell.textContent = scaledY !== undefined ? scaledY.toFixed(2) : '';
+    const scaledY = convexScaledPoints?.[i]?.y;
+    yConvexCell.textContent = scaledY !== undefined ? scaledY.toFixed(2) : '';
 
     row.appendChild(xCell);
     row.appendChild(yCell);
-    row.appendChild(yConcaveCell);
+    row.appendChild(yConvexCell);
     tableBody.appendChild(row);
   });
 }
@@ -758,7 +823,7 @@ function drawMouseCoordinates() {
   
   Redraws the canvas, including
   - Grid, axes, points, current curve.
-  - Mouse coordinates and concave fit (if applicable)
+  - Mouse coordinates and convex fit (if applicable)
 
 */
 function redrawCanvas() {
@@ -812,9 +877,9 @@ function redrawCanvas() {
       ctx.fill();
     });
 
-    // Draw concave fit if available
-    if (concaveCoefficients?.fit) {
-      drawConcaveApproximation(concaveCoefficients);
+    // Draw convex fit if available
+    if (convexPoints?.fit) {
+      drawConvexApproximation(convexPoints);
     }
   }
 
