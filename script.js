@@ -29,17 +29,19 @@ let startX = 0;
 let scrollLeft = 0;
 
 
-// For setting range of y-value
-const X_SCALE_FACTOR = 1.5
-const Y_SCALE_FACTOR = 2;
+// For setting range of the x- and y- values
+const X_SCALE_FACTOR = 2; 
+const Y_SCALE_FACTOR = 2; 
+const INITIAL_ZOOM = 2;  
+const FINAL_ZOOM = 1;   
 
 // **************************************************
 // Canvas Setup
 // **************************************************
 
-/*
-  Sets the canvas size
-*/
+/**
+ * Sets the canvas size
+ */
 function setCanvasSize() {
   canvas.style.width = '80vw';
   canvas.style.height = '80vh';
@@ -48,9 +50,9 @@ function setCanvasSize() {
   resizeCanvasToMatchDisplaySize();
 }
 
-/*
-  Matches canvas pixel dimensions to its display size
-*/
+/**
+ * Matches canvas pixel dimensions to its display size
+ */
 function resizeCanvasToMatchDisplaySize() {
   const displayWidth = canvas.clientWidth;
   const displayHeight = canvas.clientHeight;
@@ -62,38 +64,39 @@ function resizeCanvasToMatchDisplaySize() {
   }
 }
 
-
-/*
-  Convert normalized coordinates (0-1 range) to screen pixel coordinates
+/**
+ * Convert normalized coordinates to screen pixel coordinates
+ * @param {number} normX - normalized x value between 0 - 1
+ * @param {number} normY  - normalized y value between 0 - 2
+ * @returns {Object} - screen coordinates {x, y} in pixels
 */
 function normalizedToScreen(normX, normY) {
   return {
-    x: (normX/X_SCALE_FACTOR * canvas.width * scale) + offsetX,
+    x: (normX * canvas.width) + offsetX,
     y: ((1 - normY/Y_SCALE_FACTOR) * canvas.height * scale) + offsetY
   };
 }
 
-
-/*
-  Convert screen pixel coordinates to normalized coordinates (0-1 range)
-*/
+/**
+ * Convert screen pixel coordinates to normalized coordinates (0-1 range)
+ * @param {number} screenX - x value of screen pixel
+ * @param {number} screenY - y value of screen pixel
+ * @returns {Object} normalized coordinates {x, y} 
+ */
 function screenToNormalized(screenX, screenY) {
   return {
-    x: ((screenX - offsetX) / (canvas.width * scale)) * X_SCALE_FACTOR,
+    x: (screenX - offsetX) / canvas.width, 
     y: (1 - ((screenY - offsetY) / (canvas.height * scale))) * Y_SCALE_FACTOR
   };
 }
 
-/*
-  Converts screen coordinates to normalized canvas coordinates {x,y}
-  where  x, y ∈ [0,1] range and (0,0) is the bottom left corner
 
-  Input: 
-  e - Mouse/touch event
-
-  Output: 
-  Normalized coordinated of the form {x, y}
-*/
+/**
+ * Converts screen coordinates to normalized canvas coordinates {x,y}
+ * where  x, y ∈ [0,1] range and (0,0) is the bottom left corner
+ * @param {Event} e - Mouse or touch event
+ * @returns {Object} - Normalized coordinated of the form {x, y}
+ */
 function transformFromCanvas(e) {
   const rect = canvas.getBoundingClientRect();
   let x, y;
@@ -112,43 +115,27 @@ function transformFromCanvas(e) {
   return screenToNormalized(x, y);
 }
 
-
-/*
-  Returns the actual canvas pixel coordinate corresponding 
-  to the normalized coordinate
-
-  Input:
-  {x,y} - Normalized coordinate 
-  
-  Output:
-  {x, y} - Pixel coordinate
-*/
-function transformToCanvas(point) {
-  return normalizedToScreen(point.x, point.y);
-}
-
-
-
-/*
-  Draws 10x10 grid lines on the canvas.
-*/ 
+/**
+ * Draws 10x10 grid lines on the canvas.
+ */
 function drawGridLines() {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.translate(offsetX, offsetY);
-  ctx.scale(scale, scale);
+  ctx.scale(1, scale);
 
   ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
   ctx.lineWidth = 0.5;
   
   // Vertical gridlines every 0.1 units
-  for (let x = 0; x <= X_SCALE_FACTOR; x += 0.1) {
-    const pixelX = x/X_SCALE_FACTOR * canvas.width;
+  for (let x = 0; x <= 1; x += 0.1) {
+    const pixelX = x * canvas.width;
     ctx.beginPath();
     ctx.moveTo(pixelX, 0);
     ctx.lineTo(pixelX, canvas.height);
     ctx.stroke();
   }
+  
   
   // Horizontal gridlines every 0.1 units
   for (let y = 0; y <= Y_SCALE_FACTOR; y += 0.1) {
@@ -179,9 +166,10 @@ function drawGridLines() {
 }
 
 
-/*
-  Draws 0 at the orgin, and 1 and the ends of the graph
-*/
+/**
+ * Draws 0 at the orgin, 1 on the x- and y- axis,
+ * and 2 at the end of the y-axis
+ */
 function drawAxes() {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -189,8 +177,6 @@ function drawAxes() {
   const zeroPos = normalizedToScreen(0, 0);
   const oneXPos = normalizedToScreen(1, 0);
   const oneYPos = normalizedToScreen(0, 1);
-  
-  const twoXPos = normalizedToScreen(X_SCALE_FACTOR, 0);
   const twoYPos = normalizedToScreen(0, Y_SCALE_FACTOR);
   
   ctx.fillStyle = '#000';
@@ -199,10 +185,6 @@ function drawAxes() {
   ctx.fillText('1', oneXPos.x - 15, oneXPos.y - 5);
   ctx.fillText('1', oneYPos.x + 5, oneYPos.y + 15);
 
-
-  if (X_SCALE_FACTOR != 1){
-    ctx.fillText(X_SCALE_FACTOR, twoXPos.x - 25, twoXPos.y - 5);
-  }
   if (Y_SCALE_FACTOR != 1){
     ctx.fillText(Y_SCALE_FACTOR, twoYPos.x + 5, twoYPos.y + 15);
   }
@@ -211,7 +193,17 @@ function drawAxes() {
 }
 
 
+// **************************************************
+// Zooming/panning
+// **************************************************
 
+
+/**
+ * Toggles the panning tool on/off.
+ * When panning is on, switches the cursor to
+ * 'grab' and disables drawing functionality
+ * @note - called when the handtool button is clicked
+ */
 function toggleHandTool() {
   isHandToolActive = !isHandToolActive;
   const handToolBtn = document.getElementById('handTool');
@@ -225,6 +217,12 @@ function toggleHandTool() {
   }
 }
 
+/**
+ * Zooms the canvas by zoomFactor, while keeping 
+ * the canvas centered
+ * @param {number} zoomFactor - Multiplicative zoom factor (e.g., 1.2 = 120%)
+ * @note - called when user clicks + or - buttons
+ */
 function zoomCanvas(zoomFactor) {
   // Calculate new scale with constraints
   const newScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, scale * zoomFactor));
@@ -240,14 +238,46 @@ function zoomCanvas(zoomFactor) {
   redrawCanvas();
 }
 
+/**
+ * Zooms the y-axis by an absolute zoom level, maintaining
+ * bottom left positioning and animating the transition
+ * @param {number} zoom_amount - Target absolute zoom level
+ */
+function zoomY(zoom_amount) {
+  const targetScale = zoom_amount;
+  const targetOffsetY = canvas.height * (1 - targetScale);
 
-function resetView() {
-  scale = 1;
-  offsetX = 0;
-  offsetY = 0;
-  redrawCanvas();
+  const zoomSteps = 20;
+  const scaleStep = (targetScale - scale) / zoomSteps;
+  const offsetYStep = (targetOffsetY - offsetY) / zoomSteps;
+  
+  const animateZoom = () => {
+    // Only modify y-related values
+    scale += scaleStep;
+    offsetY += offsetYStep;
+    
+    redrawCanvas();
+    
+    if (Math.abs(scale - targetScale) > 0.01) {
+      requestAnimationFrame(animateZoom);
+    } else {
+      // Final adjustment
+      scale = targetScale;
+      offsetX = 0; // Ensure x stays at left edge
+      offsetY = targetOffsetY;
+      redrawCanvas();
+    }
+  };
+  
+  animateZoom();
 }
 
+/**
+ * Handles mouse movement during panning,
+ * updating canvas offsets based on mouse delta
+ * @param {MouseEvent} e - Mouse event
+ * @note - called when the the user moves their mouse on the canvas
+ */
 function handlePanMove(e) {
   if (!isHandToolActive || !isPanning) return;
   
@@ -271,6 +301,12 @@ function handlePanMove(e) {
   e.preventDefault();
 }
 
+/**
+ * Starts panning operation, storing the mouse coordinates
+ * for delta calculations and changing the cursor to 'grabbing'
+ * @param {MouseEvent} e - Mouse event object
+ * @note - called when user clicks and drags while in panning mode
+ */
 function handlePanStart(e) {
   if (!isHandToolActive) return;
   
@@ -287,11 +323,29 @@ function handlePanStart(e) {
   e.preventDefault();
 }
 
+/**
+ *  Ends panning operation, setting isPanning to false
+ * and changing the cursor to 'grab'
+ * @returns 
+ */
 function handlePanEnd() {
   if (!isHandToolActive) return;
   
   isPanning = false;
   canvas.style.cursor = 'grab';
+}
+
+
+/**
+ * Position the canvas to its inital state,
+ * with (0,0) in the bottom left corner and
+ * and x,y in range [0,1]
+ */
+function resetView() {
+  scale = INITIAL_ZOOM;
+  offsetX = 0;
+  offsetY = canvas.height * (1 - scale);
+  redrawCanvas();
 }
 
 
@@ -363,6 +417,107 @@ function endDraw(e) {
 }
 
 
+/*
+  Draws the convex approximation with:
+  - The original increasing and decreasing segments
+  - The decreasing segment flipped vertically
+*/
+function drawConvexApproximation(fitResult) {
+  if (!fitResult?.fit) return;
+  
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  
+  const peak = fitResult.fit[fitResult.peakIndex];
+  const peakScreen = normalizedToScreen(peak[0], peak[1]);
+  
+  // Draw the increasing part in blue
+  ctx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  
+  for (let i = 0; i <= fitResult.peakIndex; i++) {
+    const point = fitResult.fit[i];
+    const screen = normalizedToScreen(point[0], point[1]);
+    if (i === 0) ctx.moveTo(screen.x, screen.y);
+    else ctx.lineTo(screen.x, screen.y);
+  }
+  ctx.stroke();
+  
+  // Draw the decreasing part in orange
+  ctx.strokeStyle = 'rgba(255, 100, 0, 0.8)';
+  ctx.beginPath();
+  ctx.moveTo(peakScreen.x, peakScreen.y);
+  
+  for (let i = fitResult.peakIndex + 1; i < fitResult.fit.length; i++) {
+    const point = fitResult.fit[i];
+    const screen = normalizedToScreen(point[0], point[1]);
+    ctx.lineTo(screen.x, screen.y);
+  }
+  ctx.stroke();
+  
+  // Mark the peak point in red
+  ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+  ctx.beginPath();
+  ctx.arc(peakScreen.x, peakScreen.y, 5, 0, 2 * Math.PI);
+  ctx.fill();
+  
+
+  //  Draw the scaled graph in pink
+  ctx.strokeStyle = 'rgba(255, 203, 17, 0.8)';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  for (let i = 0; i < convexScaledPoints.length; i++) {
+  const { x, y } = convexScaledPoints[i];
+    const screen = normalizedToScreen(x, y);
+    if (i === 0) ctx.moveTo(screen.x, screen.y);
+    else ctx.lineTo(screen.x, screen.y);
+  }
+  ctx.stroke();
+
+ 
+  // Draw the flipped increasing part of the scaled graph in green
+  // to create decreasing graph
+  const flippedIncreasing = flipIncreasingPart();
+  ctx.strokeStyle = 'rgba(255, 100, 0, 0.8)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  flippedIncreasing.forEach((point, i) => {
+    const screen = normalizedToScreen(point.x, point.y);
+    if (i === 0) ctx.moveTo(screen.x, screen.y);
+    else ctx.lineTo(screen.x, screen.y);
+  });
+  ctx.stroke();
+
+  // Draw 'unflipped' increasing
+  const flippedVert = flipVertically(flippedIncreasing)
+  ctx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  flippedVert.forEach((point, i) => {
+    const screen = normalizedToScreen(point.x, point.y);
+    if (i === 0) ctx.moveTo(screen.x, screen.y);
+    else ctx.lineTo(screen.x, screen.y);
+  });
+  ctx.stroke();
+  
+  // Draw the peak scaled
+  const scaledPeakScreen = normalizedToScreen(peak[0], 1);
+  ctx.fillStyle = 'rgba(163, 57, 255, 1)';
+  ctx.beginPath();
+  ctx.arc(scaledPeakScreen.x, scaledPeakScreen.y, 5, 0, 2 * Math.PI);
+  ctx.fill();
+
+  ctx.restore();
+
+
+  // Update equation label
+  const equationText = `Convex Fit | 
+  Peak: (${peak[0].toFixed(3)}, ${peak[1].toFixed(3)}) |
+  Scaled Peak: (${convexScaledPoints[fitResult.peakIndex].x.toFixed(3)}, ${convexScaledPoints[fitResult.peakIndex].y.toFixed(3)}) |
+  Error: ${fitResult.error.toFixed(4)}`;
+  eqnLabel.textContent = equationText;
+}
 
 // **************************************************
 // Computing Best Convex Fit
@@ -430,6 +585,12 @@ function isotonicRegression(xVals, yVals, increasing = true) {
 }
 
 
+/**
+ * 
+ * @param {*} xValues 
+ * @param {*} yValues 
+ * @returns 
+ */
 /*
   Given x- and y-values, returns the best piecewise isotonic regression 
   that is increasing to a peak, then decreasing. 
@@ -559,109 +720,6 @@ function calculateError(actual, predicted) {
   return actual.reduce((sum, y, i) => sum + Math.pow(y - predicted[i], 2), 0);
 }
 
-
-/*
-  Draws the convex approximation with:
-  - The original increasing and decreasing segments
-  - The decreasing segment flipped vertically
-*/
-function drawConvexApproximation(fitResult) {
-  if (!fitResult?.fit) return;
-  
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  
-  const peak = fitResult.fit[fitResult.peakIndex];
-  const peakScreen = normalizedToScreen(peak[0], peak[1]);
-  
-  // Draw the increasing part in blue
-  ctx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  
-  for (let i = 0; i <= fitResult.peakIndex; i++) {
-    const point = fitResult.fit[i];
-    const screen = normalizedToScreen(point[0], point[1]);
-    if (i === 0) ctx.moveTo(screen.x, screen.y);
-    else ctx.lineTo(screen.x, screen.y);
-  }
-  ctx.stroke();
-  
-  // Draw the decreasing part in orange
-  ctx.strokeStyle = 'rgba(255, 100, 0, 0.8)';
-  ctx.beginPath();
-  ctx.moveTo(peakScreen.x, peakScreen.y);
-  
-  for (let i = fitResult.peakIndex + 1; i < fitResult.fit.length; i++) {
-    const point = fitResult.fit[i];
-    const screen = normalizedToScreen(point[0], point[1]);
-    ctx.lineTo(screen.x, screen.y);
-  }
-  ctx.stroke();
-  
-  // Mark the peak point in red
-  ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
-  ctx.beginPath();
-  ctx.arc(peakScreen.x, peakScreen.y, 5, 0, 2 * Math.PI);
-  ctx.fill();
-  
-
-  //  Draw the scaled graph in pink
-  /*
-  ctx.strokeStyle = 'rgba(163, 18, 203, 0.8)';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  for (let i = 0; i < convexScaledPoints.length; i++) {
-  const { x, y } = convexScaledPoints[i];
-    const screen = normalizedToScreen(x, y);
-    if (i === 0) ctx.moveTo(screen.x, screen.y);
-    else ctx.lineTo(screen.x, screen.y);
-  }
-  ctx.stroke();
-  */
- 
-  // Draw the flipped increasing part of the scaled graph in green
-  // to create decreasing graph
-  const flippedIncreasing = flipIncreasingPart();
-  ctx.strokeStyle = 'rgba(255, 100, 0, 0.8)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  flippedIncreasing.forEach((point, i) => {
-    const screen = normalizedToScreen(point.x, point.y);
-    if (i === 0) ctx.moveTo(screen.x, screen.y);
-    else ctx.lineTo(screen.x, screen.y);
-  });
-  ctx.stroke();
-
-  // Draw 'unflipped' increasing
-  const flippedVert = flipVertically(flippedIncreasing)
-  ctx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  flippedVert.forEach((point, i) => {
-    const screen = normalizedToScreen(point.x, point.y);
-    if (i === 0) ctx.moveTo(screen.x, screen.y);
-    else ctx.lineTo(screen.x, screen.y);
-  });
-  ctx.stroke();
-  
-  // Draw the peak scaled
-  const scaledPeakScreen = normalizedToScreen(peak[0], 1);
-  ctx.fillStyle = 'rgba(163, 57, 255, 1)';
-  ctx.beginPath();
-  ctx.arc(scaledPeakScreen.x, scaledPeakScreen.y, 5, 0, 2 * Math.PI);
-  ctx.fill();
-
-  ctx.restore();
-  
-  // Update equation label
-  const equationText = `Convex Fit | 
-  Peak: (${peak[0].toFixed(3)}, ${peak[1].toFixed(3)}) |
-  Scaled Peak: (${convexScaledPoints[fitResult.peakIndex].x.toFixed(3)}, ${convexScaledPoints[fitResult.peakIndex].y.toFixed(3)}) |
-  Error: ${fitResult.error.toFixed(4)}`;
-  eqnLabel.textContent = equationText;
-}
-
 // **************************************************
 //  Data Processing and UI
 // **************************************************
@@ -743,6 +801,8 @@ function finalizeGraph() {
       eqnLabel.textContent = "Error in computation";
       console.error(error);
   }
+
+  zoomY(FINAL_ZOOM)
 }
     
 
@@ -827,15 +887,13 @@ function drawMouseCoordinates() {
 
 */
 function redrawCanvas() {
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   
   // Draw grid and axes (in transformed space)
   drawGridLines();
   drawAxes();
-
-  // Save the untransformed state for drawing elements that shouldn't be transformed
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
   
   if (drawing) {
     // Draw the current line being drawn
@@ -959,7 +1017,7 @@ function handleTouchMove(e) {
 }
 
 function handleTouchEnd(e) {
-  if (!isHandToolActive) {
+  if (!isHandToolActive && !isPanning) {
     // Handle drawing if hand tool is not active
     const mouseEvent = new MouseEvent('mouseup', {});
     endDraw(mouseEvent);
@@ -971,8 +1029,6 @@ function handleTouchEnd(e) {
 }
 
 // MOUSE EVENTS
-canvas.addEventListener('mousedown', startDraw);
-canvas.addEventListener('mouseup', endDraw);
 canvas.addEventListener('mouseleave', (e) => {
   if (drawing) {
     endDraw(e); // Finalize if user releases outside canvas
@@ -1022,6 +1078,7 @@ canvas.addEventListener('mouseleave', () => {
 
 // Toolbar scrolling
 toolbar.addEventListener('mousedown', (e) => {
+  
   isDown = true;
   toolbar.style.cursor = 'grabbing';
   toolbar.style.userSelect = 'none';
@@ -1057,12 +1114,26 @@ document.getElementById('clearBtn').addEventListener('click', () => {
   tableBody.innerHTML = '';
   lastPoint = null;
   redrawCanvas();
+  resetView();
 });
 
 // Panning handlers
-canvas.addEventListener('mousedown', handlePanStart);
+
+canvas.addEventListener('mousedown', (e) => {
+  if (isHandToolActive) {
+    handlePanStart(e);
+  } else {
+    startDraw(e);
+  }
+});
 canvas.addEventListener('mousemove', handlePanMove);
-canvas.addEventListener('mouseup', handlePanEnd);
+canvas.addEventListener('mouseup', (e) => {
+  if (isPanning) {
+    handlePanEnd();
+  } else if (drawing) {
+    endDraw(e);
+  }
+});
 canvas.addEventListener('mouseleave', handlePanEnd);
 
 // Window Resize
@@ -1073,5 +1144,6 @@ window.addEventListener('resize', () => {
 
 // Initialize
 setCanvasSize();
+resetView();
 
 
