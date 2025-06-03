@@ -326,7 +326,6 @@ function handlePanStart(e) {
 /**
  *  Ends panning operation, setting isPanning to false
  * and changing the cursor to 'grab'
- * @returns 
  */
 function handlePanEnd() {
   if (!isHandToolActive) return;
@@ -354,24 +353,32 @@ function resetView() {
 // **************************************************
 
 
-/*
-  Starts a new drawing, clears points, and stores initial position.
+/**
+ * Checks if a point is within the bounds x ∈ [0,1] y ∈ [0,1]
+ * @param {number} x - x-value
+ * @param {number} y - y-value
+ * @returns - True if the element within the bounds  x ∈ [0,1] y ∈ [0,1]
+ * and false otherwise
+ */
+function isPointInBounds(x, y) {
+  return x >= 0 && x <= 1 && y >= 0 && y <= 1;
+}
 
-  Input: Mouse 
-  e - Mouse event
-
-  Output: None
-*/
+/**
+ * Starts a new drawing, clears points, and stores initial position.
+ * @param {MouseEvent} e - Mouse Event
+ */
 function startDraw(e) {
   if (isHandToolActive) return; // Don't draw when hand tool is active
-
-  drawing = true;
-  points = []; 
-  convexPoints = null; 
   const pos = transformFromCanvas(e);
-  points.push(pos);
-  redrawCanvas();
-  
+  if (isPointInBounds(pos.x, pos.y)) {
+    drawing = true;
+    points = []; 
+    convexPoints = null; 
+    points.push(pos);
+    redrawCanvas();
+    
+  }
   e.preventDefault();
 }
 
@@ -383,7 +390,7 @@ function startDraw(e) {
 */
 function draw(e) {
   const pos = transformFromCanvas(e);
-  
+
   // Update mouse position
   currentMousePos = {
     x: pos.x,
@@ -392,10 +399,10 @@ function draw(e) {
     rawY: (1 - pos.y) * canvas.height
   };
 
-   if (!drawing || isHandToolActive) { 
-      redrawCanvas();
-      return;
-    }
+  if (!drawing || isHandToolActive || !isPointInBounds(pos.x, pos.y)) { 
+    redrawCanvas();
+    return;
+  }
     
   
   points.push(pos);
@@ -864,7 +871,7 @@ function drawMouseCoordinates() {
   labelY = Math.max(15, Math.min(labelY, canvas.height - 5));
   
   // Draw background
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0)';
   ctx.fillRect(labelX - 2, labelY - 12, 100, 15);
   
   // Draw coordinates
@@ -890,6 +897,28 @@ function redrawCanvas() {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Grey out non-editable areas of the canvas
+  const topLeft = normalizedToScreen(0, 1);
+  const bottomRight = normalizedToScreen(1, 0);
+  const boxWidth = bottomRight.x - topLeft.x;
+  
+  ctx.fillStyle = 'rgba(200, 200, 200, 0.2)';
+  
+  // above y=1
+  ctx.fillRect(topLeft.x, 0, boxWidth, topLeft.y);
+  
+  // below y=0
+  ctx.fillRect(topLeft.x, bottomRight.y, boxWidth, canvas.height - bottomRight.y);
+  
+  // left of x=0
+  ctx.fillRect(0, 0, topLeft.x, canvas.height);
+  
+  // right of x=1
+  ctx.fillRect(bottomRight.x, 0, canvas.width - bottomRight.x, canvas.height);
+  
+  // Restore normal drawing
+  ctx.restore();
   
   // Draw grid and axes (in transformed space)
   drawGridLines();
