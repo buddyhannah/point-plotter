@@ -13,7 +13,8 @@ let convexPoints = null;
 
 // for zooming/panning
 let isHandToolActive = false;
-let scale = 1;
+let scaleY = 1;
+let scaleX = 1;
 let offsetX = 0;
 let offsetY = 0;
 let isPanning = false;
@@ -30,7 +31,6 @@ let scrollLeft = 0;
 
 
 // For setting range of the x- and y- values
-const X_SCALE_FACTOR = 2; 
 const Y_SCALE_FACTOR = 2; 
 const INITIAL_ZOOM = 2;  
 const FINAL_ZOOM = 1;   
@@ -72,8 +72,8 @@ function resizeCanvasToMatchDisplaySize() {
 */
 function normalizedToScreen(normX, normY) {
   return {
-    x: (normX * canvas.width) + offsetX,
-    y: ((1 - normY/Y_SCALE_FACTOR) * canvas.height * scale) + offsetY
+    x: (normX * canvas.width * scaleX) + offsetX,
+    y: ((1 - normY/Y_SCALE_FACTOR) * canvas.height * scaleY) + offsetY
   };
 }
 
@@ -85,8 +85,8 @@ function normalizedToScreen(normX, normY) {
  */
 function screenToNormalized(screenX, screenY) {
   return {
-    x: (screenX - offsetX) / canvas.width, 
-    y: (1 - ((screenY - offsetY) / (canvas.height * scale))) * Y_SCALE_FACTOR
+    x: (screenX - offsetX) / (canvas.width * scaleX), 
+    y: (1 - ((screenY - offsetY) / (canvas.height * scaleY))) * Y_SCALE_FACTOR
   };
 }
 
@@ -122,7 +122,7 @@ function drawGridLines() {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.translate(offsetX, offsetY);
-  ctx.scale(1, scale);
+  ctx.scale(scaleX, scaleY);
 
   ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
   ctx.lineWidth = 0.5;
@@ -225,16 +225,18 @@ function toggleHandTool() {
  */
 function zoomCanvas(zoomFactor) {
   // Calculate new scale with constraints
-  const newScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, scale * zoomFactor));
+  const newScaleX = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, scaleX * zoomFactor));
+  const newScaleY = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, scaleY * zoomFactor));
   
   // Adjust offsets to zoom toward center
   const centerX = canvas.width / 2;
   const centerY = canvas.height / 2;
   
-  offsetX = centerX - (centerX - offsetX) * (newScale / scale);
-  offsetY = centerY - (centerY - offsetY) * (newScale / scale);
+  offsetX = centerX - (centerX - offsetX) * (newScaleX / scaleX);
+  offsetY = centerY - (centerY - offsetY) * (newScaleY / scaleY);
   
-  scale = newScale;
+  scaleX = newScaleX;
+  scaleY = newScaleY;
   redrawCanvas();
 }
 
@@ -248,21 +250,21 @@ function zoomY(zoom_amount) {
   const targetOffsetY = canvas.height * (1 - targetScale);
 
   const zoomSteps = 20;
-  const scaleStep = (targetScale - scale) / zoomSteps;
+  const scaleStep = (targetScale - scaleY) / zoomSteps;
   const offsetYStep = (targetOffsetY - offsetY) / zoomSteps;
   
   const animateZoom = () => {
     // Only modify y-related values
-    scale += scaleStep;
+    scaleY += scaleStep;
     offsetY += offsetYStep;
     
     redrawCanvas();
     
-    if (Math.abs(scale - targetScale) > 0.01) {
+    if (Math.abs(scaleY - targetScale) > 0.01) {
       requestAnimationFrame(animateZoom);
     } else {
       // Final adjustment
-      scale = targetScale;
+      scaleY = targetScale;
       offsetX = 0; // Ensure x stays at left edge
       offsetY = targetOffsetY;
       redrawCanvas();
@@ -341,9 +343,10 @@ function handlePanEnd() {
  * and x,y in range [0,1]
  */
 function resetView() {
-  scale = INITIAL_ZOOM;
+  scaleX = 1;
+  scaleY = INITIAL_ZOOM;
   offsetX = 0;
-  offsetY = canvas.height * (1 - scale);
+  offsetY = canvas.height * (1 - scaleY);
   redrawCanvas();
 }
 
