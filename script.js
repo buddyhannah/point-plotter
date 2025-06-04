@@ -539,6 +539,7 @@ function drawConvexApproximation(fitResult) {
   // Update equation label
   const equationText = `
   Convex Fit |
+  Peak: (${peak[0].toFixed(3)}, ${peak[1].toFixed(3)}) |
   Scaled Peak: (${convexScaledPoints[fitResult.peakIndex].x.toFixed(3)}, ${convexScaledPoints[fitResult.peakIndex].y.toFixed(3)}) |
   Error: ${fitResult.error.toFixed(4)} |
   <span style="color: rgb(255, 100, 0);">g(x)</span> | 
