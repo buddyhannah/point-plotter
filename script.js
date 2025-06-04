@@ -22,6 +22,8 @@ let lastPanX = 0;
 let lastPanY = 0;
 const MAX_ZOOM = 5;
 const MIN_ZOOM = 0.5;
+let g_x = [] // decreasing function
+let h_x = [] // increasing function
 
 // for toolbar scrolling
 const toolbar = document.querySelector('.toolbar');
@@ -456,7 +458,7 @@ function drawConvexApproximation(fitResult) {
   const peakScreen = normalizedToScreen(peak[0], peak[1]);
   
   // Draw the increasing part in blue
-  ctx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
+  ctx.strokeStyle = 'rgba(192, 211, 240, 0.8)';
   ctx.lineWidth = 3;
   ctx.beginPath();
   
@@ -469,7 +471,7 @@ function drawConvexApproximation(fitResult) {
   ctx.stroke();
   
   // Draw the decreasing part in orange
-  ctx.strokeStyle = 'rgba(255, 100, 0, 0.8)';
+  ctx.strokeStyle = 'rgba(255, 198, 160, 0.8)';
   ctx.beginPath();
   ctx.moveTo(peakScreen.x, peakScreen.y);
   
@@ -488,6 +490,7 @@ function drawConvexApproximation(fitResult) {
   
 
   //  Draw the scaled graph in pink
+  /*
   ctx.strokeStyle = 'rgba(255, 203, 17, 0.8)';
   ctx.lineWidth = 5;
   ctx.beginPath();
@@ -498,15 +501,14 @@ function drawConvexApproximation(fitResult) {
     else ctx.lineTo(screen.x, screen.y);
   }
   ctx.stroke();
-
+  */
  
   // Draw the flipped increasing part of the scaled graph in green
   // to create decreasing graph
-  const flippedIncreasing = flipIncreasingPart();
   ctx.strokeStyle = 'rgba(255, 100, 0, 0.8)';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  flippedIncreasing.forEach((point, i) => {
+  g_x.forEach((point, i) => {
     const screen = normalizedToScreen(point.x, point.y);
     if (i === 0) ctx.moveTo(screen.x, screen.y);
     else ctx.lineTo(screen.x, screen.y);
@@ -514,11 +516,10 @@ function drawConvexApproximation(fitResult) {
   ctx.stroke();
 
   // Draw 'unflipped' increasing
-  const flippedVert = flipVertically(flippedIncreasing)
   ctx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  flippedVert.forEach((point, i) => {
+  h_x.forEach((point, i) => {
     const screen = normalizedToScreen(point.x, point.y);
     if (i === 0) ctx.moveTo(screen.x, screen.y);
     else ctx.lineTo(screen.x, screen.y);
@@ -536,11 +537,15 @@ function drawConvexApproximation(fitResult) {
 
 
   // Update equation label
-  const equationText = `Convex Fit | 
-  Peak: (${peak[0].toFixed(3)}, ${peak[1].toFixed(3)}) |
+  const equationText = `
+  Convex Fit |
   Scaled Peak: (${convexScaledPoints[fitResult.peakIndex].x.toFixed(3)}, ${convexScaledPoints[fitResult.peakIndex].y.toFixed(3)}) |
-  Error: ${fitResult.error.toFixed(4)}`;
-  eqnLabel.textContent = equationText;
+  Error: ${fitResult.error.toFixed(4)} |
+  <span style="color: rgb(255, 100, 0);">g(x)</span> | 
+  <span style="color: rgb(0, 100, 255);">h(x)</span>
+  `;
+  eqnLabel.innerHTML = equationText;
+
 }
 
 // **************************************************
@@ -687,6 +692,9 @@ function solveConvexRegression(xValues, yValues) {
   convexPeakIdx = bestPeakIndex
   convexScaledPoints = scalePeakOne(bestFit, bestPeakIndex).map(([x, y]) => ({ x, y }));
 
+  g_x = flipIncreasingPart(convexScaledPoints, bestPeakIndex);
+  h_x = flipVertically(g_x)
+
   return {
     fit: bestFit,
     peakIndex: bestPeakIndex,
@@ -708,12 +716,12 @@ function scalePeakOne(bestFit, peakIndex) {
  * @param {number} peakIndex - Index of the peak point
  * @returns {Array} Array of {x, y} points with increasing part flipped
  */
-function flipIncreasingPart() {
-  const peakY = convexScaledPoints[convexPeakIdx].y;
-  return convexScaledPoints.map((point, i) => {
+function flipIncreasingPart(f, peakIdx) {
+  const peakY = f[peakIdx].y;
+  return f.map((point, i) => {
     let myPoint = {...point}
 
-    if (i <= convexPeakIdx) {
+    if (i <= peakIdx) {
       // Flip increasing part around peak (y = 1)
       myPoint.y = 2 * peakY - myPoint.y;
     
@@ -840,17 +848,27 @@ function updateTable() {
     const row = document.createElement('tr');
     const xCell = document.createElement('td');
     const yCell = document.createElement('td');
-    const yConvexCell = document.createElement('td');
+    const maxCell = document.createElement('td');
+    const minCell = document.createElement('td');
     
     xCell.textContent = point.x.toFixed(2);
     yCell.textContent = point.y.toFixed(2);
 
-    const scaledY = convexScaledPoints?.[i]?.y;
-    yConvexCell.textContent = scaledY !== undefined ? scaledY.toFixed(2) : '';
+    
+    let gVal = g_x?.[i]?.y
+    let hVal = h_x?.[i]?.y
+    if (gVal > hVal) {
+      maxCell.textContent = gVal.toFixed(2);
+      minCell.textContent = hVal.toFixed(2);
+    }else{
+      maxCell.textContent = hVal.toFixed(2);
+      minCell.textContent = gVal.toFixed(2);
+    }
 
     row.appendChild(xCell);
     row.appendChild(yCell);
-    row.appendChild(yConvexCell);
+    row.appendChild(minCell);
+    row.appendChild(maxCell);
     tableBody.appendChild(row);
   });
 }
