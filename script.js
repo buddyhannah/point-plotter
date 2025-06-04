@@ -22,10 +22,6 @@ let lastPanX = 0;
 let lastPanY = 0;
 const MAX_ZOOM = 5;
 const MIN_ZOOM = 0.5;
-  // pinching to zoom
-let initialPinchDistance = 0;
-let initialScale = 1;
-let isPinching = false;
 
 // for toolbar scrolling
 const toolbar = document.querySelector('.toolbar');
@@ -232,7 +228,6 @@ function toggleHandTool() {
   } else {
     canvas.style.cursor = 'default';
     isPanning = false;
-    isPinching = false;
   }
 }
 
@@ -1026,26 +1021,16 @@ function handleTouchStart(e) {
       clientY: touch.clientY
     });
     startDraw(mouseEvent);
-  
-    // Hand tool is active
-  } else if (e.touches.length === 2) {
-      // Start pinch-to-zoom
-      isPinching = true;
-      isPanning = false;
-      initialPinchDistance = getDistanceBetweenTouches(e.touches);
-      initialScale = scaleY; // We'll use scaleY since we're zooming y-axis
-      e.preventDefault();
-  } else if (e.touches.length === 1) {
-      // Start panning
-      const touch = e.touches[0];
-      const rect = canvas.getBoundingClientRect();
-      lastPanX = touch.clientX - rect.left;
-      lastPanY = touch.clientY - rect.top;
-      isPanning = true;
-      isPinching = false;
+  } else {
+    // Handle panning if hand tool is active
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    lastPanX = touch.clientX - rect.left;
+    lastPanY = touch.clientY - rect.top;
+    isPanning = true;
+    e.preventDefault();
   }
 }
-
 
 function handleTouchMove(e) {
   if (!isHandToolActive || !isPanning) {
@@ -1056,34 +1041,7 @@ function handleTouchMove(e) {
       clientY: touch.clientY
     });
     draw(mouseEvent);
-  
-  } else if (isPinching && e.touches.length === 2) {
-    // Handle pinch-to-zoom
-    const currentDistance = getDistanceBetweenTouches(e.touches);
-    const scaleFactor = currentDistance / initialPinchDistance;
-    const newScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, initialScale * scaleFactor));
-    
-    // Calculate center point between two fingers
-    const rect = canvas.getBoundingClientRect();
-    const touch1 = e.touches[0];
-    const touch2 = e.touches[1];
-    const centerX = (touch1.clientX + touch2.clientX) / 2 - rect.left;
-    const centerY = (touch1.clientY + touch2.clientY) / 2 - rect.top;
-    
-    // Convert center point to normalized coordinates
-    const normCenter = screenToNormalized(centerX, centerY);
-    
-    // Apply zoom
-    scaleY = newScale;
-    
-    // Adjust offset to zoom toward the center point
-    offsetX = centerX - normCenter.x * canvas.width * scaleX;
-    offsetY = centerY - (1 - normCenter.y/Y_SCALE_FACTOR) * canvas.height * scaleY;
-    
-    redrawCanvas();
-    e.preventDefault();
-  
-  } else if (isPanning && e.touches.length === 1) {
+  } else {
     // Handle panning if hand tool is active
     const touch = e.touches[0];
     const rect = canvas.getBoundingClientRect();
@@ -1109,27 +1067,11 @@ function handleTouchEnd(e) {
     // Handle drawing if hand tool is not active
     const mouseEvent = new MouseEvent('mouseup', {});
     endDraw(mouseEvent);
-  } else if (e.touches.length === 0) {
-    // All touches ended
-    isPinching = false;
+  } else {
+    // Handle panning if hand tool is active
     isPanning = false;
-  } else if (e.touches.length === 1) {
-    // One touch remains - switch to panning
-    isPinching = false;
-    isPanning = true;
-    const touch = e.touches[0];
-    const rect = canvas.getBoundingClientRect();
-    lastPanX = touch.clientX - rect.left;
-    lastPanY = touch.clientY - rect.top;
+    e.preventDefault();
   }
-  e.preventDefault();
-}
-
-// Helper function to calculate distance between two touches
-function getDistanceBetweenTouches(touches) {
-  const dx = touches[0].clientX - touches[1].clientX;
-  const dy = touches[0].clientY - touches[1].clientY;
-  return Math.sqrt(dx * dx + dy * dy);
 }
 
 // MOUSE EVENTS
