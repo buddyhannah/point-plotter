@@ -58,8 +58,22 @@ function resizeCanvasToMatchDisplaySize() {
   const displayHeight = canvas.clientHeight;
   
   if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+    // Calculate visible area 
+    const currentLeft = -offsetX / (canvas.width * scaleX);
+    const currentTop = -offsetY / (canvas.height * scaleY);
+  
+    // Update canvas size
     canvas.width = displayWidth;
     canvas.height = displayHeight;
+    
+    // Recalculate offsets to keep same visible area
+    offsetX = -currentLeft * canvas.width * scaleX;
+    offsetY = -currentTop * canvas.height * scaleY;
+    
+    // Don't show area outside the graph
+    offsetX = Math.min(0, Math.max(canvas.width * (1 - scaleX), offsetX));
+    offsetY = Math.min(0, Math.max(canvas.height * (1 - scaleY), offsetY));
+    
     redrawCanvas();
   }
 }
@@ -1173,6 +1187,12 @@ window.addEventListener('resize', () => {
   setCanvasSize();
 });
 
+// Orientation change listener
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => {
+    resizeCanvasToMatchDisplaySize();
+  }, 100);
+});
 
 // Initialize
 setCanvasSize();
