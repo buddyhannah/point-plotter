@@ -2,14 +2,12 @@ const canvas = document.getElementById('drawCanvas');
 const eqnLabel = document.getElementById('eqnLabel');
 const ctx = canvas.getContext('2d');
 const tableBody = document.getElementById('pointTableBody');
+const toggleBtn = document.getElementById('toggleFunction');
+const functionSelect = document.getElementById('functionSelect');
 
+// For drawing
 let currentMousePos = null;
 let drawing = false;
-let points = [];
-let lastPoint = null;
-let convexScaledPoints = []; // [ { x: x1, y: y1 }, { x: x2, y: y2 }, ... ];
-let convexPeakIdx = -1
-let convexPoints = null;
 
 // for zooming/panning
 let isHandToolActive = false;
@@ -22,8 +20,6 @@ let lastPanX = 0;
 let lastPanY = 0;
 const MAX_ZOOM = 5;
 const MIN_ZOOM = 0.5;
-let g_x = [] // decreasing function
-let h_x = [] // increasing function
 
 // for toolbar scrolling
 const toolbar = document.querySelector('.toolbar');
@@ -31,11 +27,49 @@ let isDown = false;
 let startX = 0;
 let scrollLeft = 0;
 
-
 // For setting range of the x- and y- values
 const Y_SCALE_FACTOR = 2; 
 const INITIAL_ZOOM = 2;  
 const FINAL_ZOOM = 1;   
+
+/** 'f', 'g', or 'h' */
+let currentFunc = 'f'; 
+
+let F = [];
+let G = [];
+
+// Scaled Convex approx.
+let convexF = [];
+let convexScaledF = []
+let peakIdxF = null;
+let errorF = null;
+
+let convexG = [];
+let convexScaledG = []
+let peakIdxG = null;
+let errorG = null;
+
+// Flipped Convex approx.
+let convexFlippedF = [];
+let convexFlippedG = [];
+
+// Color schemes
+const gColors = {
+  main: 'rgb(235, 164, 123)',        
+  scaled: 'rgb(255, 196, 0)',
+  scaledPeak: 'rgb(218, 58, 9)',      
+  flipped: 'rgb(248, 120, 15)'   
+  
+};
+
+
+const fColors = {
+  main: 'rgb(187, 224, 241)',        
+  scaled: 'rgb(140, 238, 230)',
+  scaledPeak: 'rgb(0, 90, 163)',      
+  flipped: 'rgb(85, 151, 238)'   
+};
+
 
 // **************************************************
 // Canvas Setup
@@ -372,6 +406,17 @@ function resetView() {
 // **************************************************
 
 
+
+// Function to switch between f and g
+function toggleFunction() {
+  currentFunc = currentFunc === 'f' ? 'g' : 'f';
+  drawing = false;
+  redrawCanvas();
+  
+  // Update UI to show which function is being drawn
+  toggleBtn.textContent = `Drawing: ${currentFunc.toUpperCase()}`;
+}
+
 /**
  * Checks if a point is within the bounds x ∈ [0,1] y ∈ [0,1]
  * @param {number} x - x-value
@@ -392,18 +437,32 @@ function startDraw(e) {
   const pos = transformFromCanvas(e);
   if (isPointInBounds(pos.x, pos.y)) {
     drawing = true;
-    points = []; 
-    convexPoints = null; 
-    points.push(pos);
+    clearFuncVars(currentFunc)
     redrawCanvas();
-    
   }
   e.preventDefault();
 }
 
+function clearFuncVars(label){
+  if(label === 'f'){
+    F = [];
+    convexF = [];
+    convexScaledF = []
+    convexFlippedF = [];
+    peakIdxF = null;
+  }else{
+    G = [];
+    convexG = [];
+    convexScaledG = []
+    convexFlippedG = [];
+    peakIdxG = null;
+  }
+
+}
+
 /* 
   Adds current mouse position to points array during drawing
-  
+  Constructs F and G as [{x:x1, y:y1}, {x:x2, y:y2}, ...]
   Input: 
   e - Mouse event
 */
@@ -422,10 +481,13 @@ function draw(e) {
     redrawCanvas();
     return;
   }
+
+  if (currentFunc === 'f') {
+    F.push(pos);
+  } else {
+    G.push(pos);
+  }
     
-  
-  points.push(pos);
-  lastPoint = pos;
   redrawCanvas();
   e.preventDefault();
 }
@@ -438,7 +500,12 @@ function draw(e) {
 */
 function endDraw(e) {
   drawing = false;
-  finalizeGraph(); // Process points and generate table
+  // Process points and generate table
+  if (currentFunc === 'f' && F.length > 0) {
+    manipulateGraph('f');
+  } else if (currentFunc === 'g' && G.length > 0) {
+    manipulateGraph('g');
+  }
   e.preventDefault();
 }
 
@@ -448,106 +515,135 @@ function endDraw(e) {
   - The original increasing and decreasing segments
   - The decreasing segment flipped vertically
 */
-function drawConvexApproximation(fitResult) {
-  if (!fitResult?.fit) return;
+// convexF, peakIdxF, convexScaledF, convexFlippedF, '#1e81b0'
+/*
+  Draws the convex approximation with:
+  - The original increasing and decreasing segments
+  - The peak point marked
+  - The scaled and flipped versions if available
+  @param {string} label - 'f' or 'g' to specify which function to draw
+*/
+function drawConvexApproximation(label) {
+  // Get the correct data based on label
+  let convex, peakIdx, scaled, flipped, colors;
+  
+  if (label === 'f') {
+    convex = convexF;
+    peakIdx = peakIdxF;
+    scaled = convexScaledF;
+    flipped = convexFlippedF;
+    colors = fColors;
+  } 
+  else if (label === 'g') {
+    convex = convexG;
+    peakIdx = peakIdxG;
+    scaled = convexScaledG;
+    flipped = convexFlippedG;
+    colors = gColors;
+  }
+  else {
+    return; // Invalid label
+  }
+
+  if (!convex || convex.length === 0 || peakIdx === null) return;
   
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   
-  const peak = fitResult.fit[fitResult.peakIndex];
-  const peakScreen = normalizedToScreen(peak[0], peak[1]);
-  
-  // Draw the increasing part in blue
-  ctx.strokeStyle = 'rgba(192, 211, 240, 0.8)';
-  ctx.lineWidth = 3;
+  // Draw the original convex shape in main color
+  ctx.strokeStyle = colors.main;
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  
-  for (let i = 0; i <= fitResult.peakIndex; i++) {
-    const point = fitResult.fit[i];
-    const screen = normalizedToScreen(point[0], point[1]);
-    if (i === 0) ctx.moveTo(screen.x, screen.y);
-    else ctx.lineTo(screen.x, screen.y);
-  }
-  ctx.stroke();
-  
-  // Draw the decreasing part in orange
-  ctx.strokeStyle = 'rgba(255, 198, 160, 0.8)';
-  ctx.beginPath();
-  ctx.moveTo(peakScreen.x, peakScreen.y);
-  
-  for (let i = fitResult.peakIndex + 1; i < fitResult.fit.length; i++) {
-    const point = fitResult.fit[i];
+
+  // First point
+  const firstPoint = convex[0];
+  const firstScreen = normalizedToScreen(firstPoint[0], firstPoint[1]);
+  ctx.moveTo(firstScreen.x, firstScreen.y);
+
+  // Remaining points
+  for (let i = 1; i < convex.length; i++) {
+    const point = convex[i];
     const screen = normalizedToScreen(point[0], point[1]);
     ctx.lineTo(screen.x, screen.y);
   }
-  ctx.stroke();
-  
-  // Mark the peak point in red
-  ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
-  ctx.beginPath();
-  ctx.arc(peakScreen.x, peakScreen.y, 5, 0, 2 * Math.PI);
-  ctx.fill();
-  
 
-  //  Draw the scaled graph in pink
-  /*
-  ctx.strokeStyle = 'rgba(255, 203, 17, 0.8)';
-  ctx.lineWidth = 5;
-  ctx.beginPath();
-  for (let i = 0; i < convexScaledPoints.length; i++) {
-  const { x, y } = convexScaledPoints[i];
-    const screen = normalizedToScreen(x, y);
-    if (i === 0) ctx.moveTo(screen.x, screen.y);
-    else ctx.lineTo(screen.x, screen.y);
+  ctx.stroke();
+
+  
+  // Draw scaled version if available
+  if (scaled && scaled.length > 0) {
+    ctx.strokeStyle = colors.scaled;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i < scaled.length; i++) {
+      const point = scaled[i];
+      const screen = normalizedToScreen(point[0], point[1]);
+      if (i === 0) ctx.moveTo(screen.x, screen.y);
+      else ctx.lineTo(screen.x, screen.y);
+    }
+    ctx.stroke();
+  
   }
-  ctx.stroke();
-  */
- 
-  // Draw the flipped increasing part of the scaled graph in green
-  // to create decreasing graph
-  ctx.strokeStyle = 'rgba(255, 100, 0, 0.8)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  g_x.forEach((point, i) => {
-    const screen = normalizedToScreen(point.x, point.y);
-    if (i === 0) ctx.moveTo(screen.x, screen.y);
-    else ctx.lineTo(screen.x, screen.y);
-  });
-  ctx.stroke();
-
-  // Draw 'unflipped' increasing
-  ctx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  h_x.forEach((point, i) => {
-    const screen = normalizedToScreen(point.x, point.y);
-    if (i === 0) ctx.moveTo(screen.x, screen.y);
-    else ctx.lineTo(screen.x, screen.y);
-  });
-  ctx.stroke();
   
-  // Draw the peak scaled
-  const scaledPeakScreen = normalizedToScreen(peak[0], 1);
-  ctx.fillStyle = 'rgba(163, 57, 255, 1)';
+  // Draw flipped version if available
+  if (flipped && flipped.length > 0) {
+    ctx.strokeStyle = colors.flipped;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let i = 0; i < flipped.length; i++) {
+      const point = flipped[i];
+      const screen = normalizedToScreen(point[0], point[1]);
+      if (i === 0) ctx.moveTo(screen.x, screen.y);
+      else ctx.lineTo(screen.x, screen.y);
+    }
+    ctx.stroke();
+  }
+  
+  // Draw scaled peak
+  const scaledPeak = scaled[peakIdx];
+  const scaledPeakScreen = normalizedToScreen(scaledPeak[0], scaledPeak[1]);
+  ctx.fillStyle = colors.scaledPeak;
   ctx.beginPath();
-  ctx.arc(scaledPeakScreen.x, scaledPeakScreen.y, 5, 0, 2 * Math.PI);
+  ctx.arc(scaledPeakScreen.x, scaledPeakScreen.y, 3, 0, 2 * Math.PI);
   ctx.fill();
 
   ctx.restore();
 
-
-  // Update equation label
-  const equationText = `
-  Convex Fit |
-  Peak: (${peak[0].toFixed(3)}, ${peak[1].toFixed(3)}) |
-  Scaled Peak: (${convexScaledPoints[fitResult.peakIndex].x.toFixed(3)}, ${convexScaledPoints[fitResult.peakIndex].y.toFixed(3)}) |
-  Error: ${fitResult.error.toFixed(4)} |
-  <span style="color: rgb(255, 100, 0);">g(x)</span> | 
-  <span style="color: rgb(0, 100, 255);">h(x)</span>
-  `;
-  eqnLabel.innerHTML = equationText;
-
+  updateEquationLabel() 
 }
+
+
+
+function updateEquationLabel(value) {
+  let labelText = '';
+
+  if (F.length > 0) {
+    labelText += `
+      <div style="margin-bottom: 5px;">
+        <strong style="color: ${fColors.main};">f(x)</strong> |
+        <span style="color: ${fColors.scaled};">f(x)<sub>c</sub></span> |
+        <span style="color: ${fColors.flipped};">f(x)<sub>c</sub><sup>Flipped</sup></span> |
+        Convex Peak X: ${convexF[peakIdxF]?.[0]?.toFixed(2) ?? 'N/A'} |
+        Convex Error: ${errorF.toFixed(4)}
+      </div>
+    `;
+  }
+
+  if (G.length > 0) {
+    labelText += `
+      <div style="margin-bottom: 5px;">
+        <strong style="color: ${gColors.main};">g(x)</strong> |
+        <span style="color: ${gColors.scaled};">g(x)<sub>c</sub></span> |
+        <span style="color: ${gColors.flipped};">g(x)<sub>c</sub><sup>Flipped</sup></span> |
+        Convex Peak X: ${convexG[peakIdxG]?.[0]?.toFixed(2) ?? 'N/A'} |
+        Convex Error: ${errorG.toFixed(4)}
+      </div>
+    `;
+  }
+
+  eqnLabel.innerHTML = labelText;
+}
+
 
 // **************************************************
 // Computing Best Convex Fit
@@ -616,28 +712,22 @@ function isotonicRegression(xVals, yVals, increasing = true) {
 
 
 /**
- * 
- * @param {*} xValues 
- * @param {*} yValues 
- * @returns 
+ * Given x- and y-values, returns the best piecewise isotonic regression 
+ * that is increasing to a peak, then decreasing.
+ * @param {array} points - array of coordinates 
+ * of form [[x:0.01, y:y1], [x:0.02, y:y2], ... [x:1, y:101]]
+ * @returns  
+    - fit: best convex fit, represented as an array of form
+      [[x:0.01, y:y1], [x:0.02, y:y2], ... [x:1, y:101]]
+    - peakIndex: index of the peak
+    - error: total squared error of the best fit
+   @note Time complexity is O(n^2)
  */
-/*
-  Given x- and y-values, returns the best piecewise isotonic regression 
-  that is increasing to a peak, then decreasing. 
-
-  Input:
-  xVals - array of x-values (in increasing order)
-  yVals - array of y-values
-  
-  Output:
-  - fit: array of [x, fittedY]
-  - peakIndex: index of the peak
-  - error: total squared error of the best fit
-
-  Time complexity: O(n^2)
-*/
-function solveConvexRegression(xValues, yValues) {
+function solveConvexRegression(points) {
+  const xValues = points.map(p => p.x);
+  const yValues = points.map(p => p.y);
   const n = xValues.length;
+  
   if (n < 3) return null;
 
   let bestError = Infinity;
@@ -689,13 +779,6 @@ function solveConvexRegression(xValues, yValues) {
    
   }
 
-  // Find scaled convex fit
-  convexPeakIdx = bestPeakIndex
-  convexScaledPoints = scalePeakOne(bestFit, bestPeakIndex).map(([x, y]) => ({ x, y }));
-
-  g_x = flipIncreasingPart(convexScaledPoints, bestPeakIndex);
-  h_x = flipVertically(g_x)
-
   return {
     fit: bestFit,
     peakIndex: bestPeakIndex,
@@ -703,34 +786,45 @@ function solveConvexRegression(xValues, yValues) {
   };
 }
 
-/* Scales the points so the peak value is 1 */
-function scalePeakOne(bestFit, peakIndex) {
-  const maxY = bestFit[peakIndex][1]; // Get y-value at peak index
-  if (maxY === 0) return bestFit;     // Avoid division by zero
-  return bestFit.map(([x, y]) => [x, y / maxY]);
+
+/**
+ * Scales the points so the peak y-value is 1
+ * @param {*} points - array of points of form
+ * [[x:0.01, y:y1], [x:0.02, y:y2], ... [x:1, y:101]]
+ * representig the convex approx.
+ * @param {*} peakIndex - Index of the peak point of the graph
+ * @returns scaled points of form 
+ * [[x:0.01, y:y1], [x:0.02, y:y2], ... [x:1, y:101]] 
+ *  where the peak y-value is 1
+ * 
+ * FIX ME!
+ */
+function scalePeakOne(points, peakIndex) {
+  const maxY = points[peakIndex][1]; // Get y-value at peak index
+  if (maxY === 0) return points;     // Avoid division by zero
+  return points.map(([x, y]) => [x, y / maxY]);
 }
 
 /**
- * Flips the increasing part of convex scaled points vertically around the peak
- * while keeping the decreasing part unchanged
- * @param {Array} convexScaledPoints - Array of {x, y} points (peak scaled to 1)
+ * Vertically flips the increasing part of the convex approx. 
+ * around the peak point while keeping the decreasing part unchanged
+ * @param {array} convexScaledPoints - Array of points of form
+ * [[x:0.01, y:y1], [x:0.02, y:y2], ... [x:1, y:101]] representing the
+ * convex approx.
  * @param {number} peakIndex - Index of the peak point
- * @returns {Array} Array of {x, y} points with increasing part flipped
+ * @returns {Array} Array of  points representing the 
+ * convex approximation with the increasing part flipped
  */
 function flipIncreasingPart(f, peakIdx) {
-  const peakY = f[peakIdx].y;
-  return f.map((point, i) => {
-    let myPoint = {...point}
-
+  const peakY = f[peakIdx][1]; // y-value
+  return f.map(([x, y], i) => {
     if (i <= peakIdx) {
-      // Flip increasing part around peak (y = 1)
-      myPoint.y = 2 * peakY - myPoint.y;
-    
+      return [x, 2 * peakY - y];
     }
-    // Keep decreasing part as is
-    return myPoint
+    return [x, y];
   });
 }
+
 
 /**
  * Flips the entire graph vertically by calculating 2 - x for each point
@@ -758,29 +852,24 @@ function calculateError(actual, predicted) {
 // **************************************************
 
 
-/*
-  
-  Processes the drawn points by:
-  - Sorting them by ascending x-value
-  - Generating a set of points at x-intervals of 0.01 (from 0 to 1) using linear interpolation if needed
-  - Calling solveConvexRegression to compute a convex regression fit from the processed data.
-  - Calling  updateTable and redrawCanvas to update he table and canvas with the results
-
-*/
-function finalizeGraph() {
-  if (points.length < 3) {
-    eqnLabel.textContent = "Need at least 3 points";
-    return;
-  }
-
+/**
+ * Proceeses the drawing into a function with
+ * 101 evenly spaced points, filling in missing 
+ * values using linear interpolation. 
+ * @param {array} points - Array of coordinates of form 
+ * [[x:x1, y:y1], [x:x1, y:y2], ...]
+ * @returns an array of regularly spaced points of form
+ * [[x:0.01, y:y1], [x:0.02, y:y2], ... [x:1, y:101]]
+ */
+function processPoints(points){
   // Sort points by ascending x-value
   points = [...points].sort((a, b) => a.x - b.x);
  
-  const processedPoints = [];
   const xStep = 0.01;
   let currentX = 0;
   let pointIndex = 0;
-  
+  const processedPoints = [];
+
   // Create interpolated points at regular intervals
   while (currentX <= 1.001 && pointIndex < points.length) {
     // Find the point closest to currentX
@@ -803,39 +892,89 @@ function finalizeGraph() {
       yValue = y0 + t * (y1 - y0);
     }
     
-    processedPoints.push({
+    processedPoints.push(
+    {
       x: currentX,
       y: yValue
     });
-    
     currentX += xStep;
   }
+  return processedPoints
+}
 
-  // Update points
-  points = processedPoints
 
-  const xValues = processedPoints.map(p => p.x);
-  const yValues = processedPoints.map(p => p.y);
+// Calculate min/max of f and g
+function calculateCombinedResults() {
+  if (!convexF || !convexG) return;
   
-  try {
-    eqnLabel.textContent = "Computing...";
-    const result = solveConvexRegression(xValues, yValues);
+  const combined = [];
+  for (let i = 0; i < convexF.fit.length; i++) {
+    const x = convexF.fit[i][0];
+    const yF = convexF.fit[i][1];
+    const yG = convexG.fit[i][1];
     
-    if (!result) {
-        eqnLabel.textContent = 'Could not compute regression.';
-        return;
-    }
-    
-    convexPoints = result;
+    combined.push({
+      x: x,
+      min: Math.min(yF, yG),
+      max: Math.max(yF, yG)
+    });
+  }
+  
+  return combined
+}
 
-    updateTable(); 
+
+/**
+ * Processes the drawn points by:
+  - Sorting them by ascending x-value
+  - Generating a set of points at x-intervals of 0.01 (from 0 to 1) using linear interpolation if needed
+  - Calling solveConvexRegression to compute a convex regression fit from the processed data.
+  - Calling  updateTable and redrawCanvas to update he table and canvas with the results
+ * @param {string} func ('f', 'g', 'h')  - function to manipulate
+ */
+function manipulateGraph(func) {
+  const points = func === 'f' ? [...F] : [...G];
+
+  if (points.length < 3) {
+    eqnLabel.textContent = "Need at least 3 points for " + func.label;
+    return;
+  }
+
+  // Process function
+  try {
+    const processed = processPoints(points);
+    const result = solveConvexRegression(processed);
+    const scaled = scalePeakOne(result.fit, result.peakIndex)
+    console.log(scaled)
+    const flipped = flipIncreasingPart(scaled,result.peakIndex)
+    console.log(flipped)
+
+    if (func == 'f'){
+      F = processed
+      peakIdxF = result.peakIndex
+      convexF = result.fit
+      errorF = result.error
+      convexScaledF = scaled;
+      convexFlippedF = flipped
+    }else {
+      G = processed
+      peakIdxG = result.peakIndex
+      convexG = result.fit
+      errorG = result.error
+      convexScaledG = scaled;
+      convexFlippedG = flipped
+    }
+ 
+    // redraw canvas
+    updateTable();
     redrawCanvas();
+    zoomY(FINAL_ZOOM)
+
   } catch (error) {
       eqnLabel.textContent = "Error in computation";
       console.error(error);
   }
-
-  zoomY(FINAL_ZOOM)
+  
 }
     
 
@@ -843,39 +982,88 @@ function finalizeGraph() {
   Populates the HTML table with point coordinates.
 */
 function updateTable() {
-  tableBody.innerHTML = '';
-  
-  points.forEach((point, i) => {
-    const row = document.createElement('tr');
-    const xCell = document.createElement('td');
-    const yCell = document.createElement('td');
-    const maxCell = document.createElement('td');
-    const minCell = document.createElement('td');
-    
-    xCell.textContent = point.x.toFixed(2);
-    yCell.textContent = point.y.toFixed(2);
+  tableBody.innerHTML = ''; // Clear previous table
 
+  for (let i = 0; i <= 100; i++) {
+    const x = (i / 100).toFixed(2);
+    const row = document.createElement("tr");
+
+    // Add x value cell
+    const xCell = document.createElement("td");
+    xCell.textContent = x;
+    row.appendChild(xCell);
+
+    // Helper to create cells with y values
+    const addYCell = (point) => {
+      const td = document.createElement("td");
+      if (!point) {
+        td.textContent = "";
+        return td;
+      }
+      
+      // Handle both object {x,y} and array [x,y] formats
+      if (point.y !== undefined) {
+        td.textContent = point.y.toFixed(2);
+      } else if (Array.isArray(point) && point.length >= 2) {
+        td.textContent = point[1].toFixed(2);
+      } else {
+        td.textContent = "";
+      }
+      return td;
+    };
+
+    // Original functions
+    row.appendChild(addYCell(F[i]));
+    row.appendChild(addYCell(G[i]));
+
+    // Scaled convex approximations
+    row.appendChild(addYCell(convexScaledF[i]));
+    row.appendChild(addYCell(convexScaledG[i]));
+
+    // Flipped convex functions
+    const cff = convexFlippedF[i];
+    const cfg = convexFlippedG[i];
+    row.appendChild(addYCell(cff));
+    row.appendChild(addYCell(cfg));
+
+    // Calculate min and max of flipped functions
+    const minCell = document.createElement("td");
+    const maxCell = document.createElement("td");
     
-    let gVal = g_x?.[i]?.y
-    let hVal = h_x?.[i]?.y
-    if (gVal > hVal) {
-      maxCell.textContent = gVal.toFixed(2);
-      minCell.textContent = hVal.toFixed(2);
-    }else{
-      maxCell.textContent = hVal.toFixed(2);
-      minCell.textContent = gVal.toFixed(2);
+    // Extract y values from flipped functions
+    const getYValue = (point) => {
+      if (!point) return NaN;
+      let yValue;
+
+      if (point.y !== undefined) {
+        yValue = point.y;
+      } else if (Array.isArray(point)) {
+        yValue = point[1];
+      } else {
+        yValue = NaN;
+      }
+
+      return yValue;
+
+    };
+
+    const cffY = getYValue(cff);
+    const cfgY = getYValue(cfg);
+
+    if (!isNaN(cffY) && !isNaN(cfgY)) {
+      minCell.textContent = Math.min(cffY, cfgY).toFixed(2);
+      maxCell.textContent = Math.max(cffY, cfgY).toFixed(2);
+    } else {
+      minCell.textContent = "";
+      maxCell.textContent = "";
     }
 
-    row.appendChild(xCell);
-    row.appendChild(yCell);
     row.appendChild(minCell);
     row.appendChild(maxCell);
+
     tableBody.appendChild(row);
-  });
+  }
 }
-
-
-
 
 /*
   Draws mouse coordinates onto the canvas.
@@ -960,59 +1148,59 @@ function redrawCanvas() {
   drawGridLines();
   drawAxes();
   
-  if (drawing) {
-    // Draw the current line being drawn
-    if (points.length > 1) {
-      ctx.strokeStyle = '#1e81b0';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      
-      let first = normalizedToScreen(points[0].x, points[0].y);
-      ctx.moveTo(first.x, first.y);
-      
-      for (let i = 1; i < points.length; i++) {
-        let p = normalizedToScreen(points[i].x, points[i].y);
-        ctx.lineTo(p.x, p.y);
-      }
-      ctx.stroke();
+  // Draw function f (blue)
+  if (F.length > 0) {
+    drawPoints(F, '#1e81b0');
+    if (convexF.length > 0) {
+      drawConvexApproximation('f');
     }
-  } else if (points.length > 1) {
-    // Draw the final curve
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    
-    let first = normalizedToScreen(points[0].x, points[0].y);
-    ctx.moveTo(first.x, first.y);
-    
-    for (let i = 1; i < points.length; i++) {
-      let p = normalizedToScreen(points[i].x, points[i].y);
-      ctx.lineTo(p.x, p.y);
-    }
-    ctx.stroke();
-    
-    // Draw points
-    ctx.fillStyle = '#000';
-    points.forEach(p => {
-      const screen = normalizedToScreen(p.x, p.y);
-      ctx.beginPath();
-      ctx.arc(screen.x, screen.y, 3, 0, 2 * Math.PI);
-      ctx.fill();
-    });
-
-    // Draw convex fit if available
-    if (convexPoints?.fit) {
-      drawConvexApproximation(convexPoints);
+  }
+  
+  // Draw function g (orange)
+  if (G.length > 0) {
+    drawPoints(G, '#ff7f00');
+    if (convexG.length > 0) {
+      drawConvexApproximation('g');
     }
   }
 
-  // Restore the untransformed state
-  ctx.restore();
-  
   // Draw mouse coordinates (always in screen space)
   drawMouseCoordinates();
 }
 
+function drawPoints(func, color){
+
+  
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    
+    // Start with first point
+    const firstPoint = func[0];
+    const firstScreen = normalizedToScreen(firstPoint.x, firstPoint.y);
+    ctx.moveTo(firstScreen.x, firstScreen.y);
+    
+    // Draw lines to all subsequent points
+    for (let i = 1; i < func.length; i++) {
+      const point = func[i];
+      const screen = normalizedToScreen(point.x, point.y);
+      ctx.lineTo(screen.x, screen.y);
+    }
+    
+    ctx.stroke();
+
+    if (!drawing){
+      // Draw points
+      ctx.fillStyle = color;
+      func.forEach(p => {
+        const screen = normalizedToScreen(p.x, p.y);
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y, 2, 0, 2 * Math.PI);
+        ctx.fill();
+      });
+    }
+   
+}
 
 // **************************************************
 // Event Listeners
@@ -1023,6 +1211,12 @@ canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
 canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
 canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
 
+
+
+functionSelect.addEventListener('change', (e) => {
+  currentFunc = e.target.value;
+  
+});
 
 /*
 
@@ -1141,6 +1335,7 @@ canvas.addEventListener('mouseleave', () => {
   redrawCanvas();
 });
 
+
 // Toolbar scrolling
 toolbar.addEventListener('mousedown', (e) => {
   
@@ -1175,9 +1370,9 @@ document.getElementById('zoomIn').addEventListener('click', () => zoomCanvas(1.2
 document.getElementById('zoomOut').addEventListener('click', () => zoomCanvas(0.8));
 document.getElementById('resetView').addEventListener('click', resetView);
 document.getElementById('clearBtn').addEventListener('click', () => {
-  points = [];
+  F = [];
+  G = [];
   tableBody.innerHTML = '';
-  lastPoint = null;
   redrawCanvas();
   resetView();
 });
@@ -1191,7 +1386,9 @@ canvas.addEventListener('mousedown', (e) => {
     startDraw(e);
   }
 });
+
 canvas.addEventListener('mousemove', handlePanMove);
+
 canvas.addEventListener('mouseup', (e) => {
   if (isPanning) {
     handlePanEnd();

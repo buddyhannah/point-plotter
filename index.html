@@ -8,6 +8,10 @@
 </head>
 <body>
   <h1>Convex FitSketch</h1>
+  <select id="functionSelect" class="functionSelect">
+    <option value="f">F</option>
+    <option value="g">G</option>
+  </select>
   </div>
   <div class="toolbar-container">
     <div class="toolbar">
@@ -21,12 +25,31 @@
   <canvas id="drawCanvas"></canvas>
   <p id="eqnLabel"></p>
   
-  <table>
-    <thead>
-      <tr><th>X</th><th>Y</th><th>min{g,h}(x)</th><th>max{g,h}(x)</th></tr>
-    </thead>
-    <tbody id="pointTableBody"></tbody>
-  </table>
+  <div class="table-scroll-container">
+    <table>
+      <thead>
+        <tr>
+          <th>x</th>
+          <th>f(x)</th>
+          <th>g(x)</th>
+          <th>f(x)<sub>c</sub></th>
+          <th>g(x)<sub>c</sub></th>
+          <th>f(x)<sub>c</sub><sup>Flipped</sup></th>
+          <th>g(x)<sub>c</sub><sup>Flipped</sup></th>
+          <th>min{
+            f<sub>c</sub><sup>Flipped</sup>,
+            g<sub>c</sub><sup>Flipped</sup>
+            }(x)
+          </th>
+          <th>max{f<sub>c</sub><sup>Flipped</sup>,
+            g<sub>c</sub><sup>Flipped</sup>
+            }(x)
+          </th>
+        </tr>
+      </thead>
+      <tbody id="pointTableBody"></tbody>
+    </table>
+  </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/10.6.4/math.min.js"></script>
   <script src="script.js"></script>
