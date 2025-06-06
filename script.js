@@ -27,6 +27,12 @@ let isDown = false;
 let startX = 0;
 let scrollLeft = 0;
 
+// for table scrolling
+const tableScroll = document.querySelector('.table-scroll');
+let tableIsDown = false;
+let tableStartX = 0;
+let tableScrollLeft = 0;
+
 // For setting range of the x- and y- values
 const Y_SCALE_FACTOR = 2; 
 const INITIAL_ZOOM = 2;  
@@ -55,20 +61,27 @@ let convexFlippedG = [];
 
 // Color schemes
 const gColors = {
-  main: 'rgb(235, 164, 123)',        
-  scaled: 'rgb(255, 196, 0)',
-  scaledPeak: 'rgb(218, 58, 9)',      
-  flipped: 'rgb(248, 120, 15)'   
-  
+  raw:        { color: 'rgb(255, 100, 0)',     linewidth: 1 },
+  main:       { color: 'rgba(255, 187, 160, 0.6)', linewidth: 2.5 },
+  scaled:     { color: 'rgb(255, 190, 80)',    linewidth: 1 },
+  scaledPeak: { color: 'rgb(180, 40, 0)' },
+  flipped:    { color: 'rgb(255, 150, 40)',    linewidth: 1 },
+  min:        { color: '#00ff00', linewidth: 6, lineDash: [2, 2] }, // Bright green, very visible
+  max:        { color: '#ff00ff', linewidth: 6, lineDash: [1, 4] }  // Bright magenta for contrast
 };
-
 
 const fColors = {
-  main: 'rgb(187, 224, 241)',        
-  scaled: 'rgb(140, 238, 230)',
-  scaledPeak: 'rgb(0, 90, 163)',      
-  flipped: 'rgb(85, 151, 238)'   
+  raw:        { color: 'rgb(0, 100, 180)',     linewidth: 1 },
+  main:       { color: 'rgba(150, 220, 255, 0.6)', linewidth: 2.5 },
+  scaled:     { color: 'rgb(80, 200, 210)',    linewidth: 1 },
+  scaledPeak: { color: 'rgb(0, 60, 120)' },
+  flipped:    { color: 'rgb(40, 140, 220)',    linewidth: 1 },
+  min:        { color: '#00ff00', linewidth: 6, lineDash: [2, 2] },
+  max:        { color: '#ff00ff', linewidth: 6, lineDash: [1, 4] }
 };
+
+
+
 
 
 // **************************************************
@@ -437,6 +450,7 @@ function startDraw(e) {
   const pos = transformFromCanvas(e);
   if (isPointInBounds(pos.x, pos.y)) {
     drawing = true;
+    resetView();
     clearFuncVars(currentFunc)
     redrawCanvas();
   }
@@ -524,122 +538,205 @@ function endDraw(e) {
   @param {string} label - 'f' or 'g' to specify which function to draw
 */
 function drawConvexApproximation(label) {
-  // Get the correct data based on label
-  let convex, peakIdx, scaled, flipped, colors;
-  
-  if (label === 'f') {
-    convex = convexF;
-    peakIdx = peakIdxF;
-    scaled = convexScaledF;
-    flipped = convexFlippedF;
-    colors = fColors;
-  } 
-  else if (label === 'g') {
-    convex = convexG;
-    peakIdx = peakIdxG;
-    scaled = convexScaledG;
-    flipped = convexFlippedG;
-    colors = gColors;
-  }
-  else {
-    return; // Invalid label
-  }
+  const isF = label === 'f';
+  const isG = label === 'g';
+  if (!isF && !isG) return;
+
+  const convex     = isF ? convexF : convexG;
+  const peakIdx    = isF ? peakIdxF : peakIdxG;
+  const scaled     = isF ? convexScaledF : convexScaledG;
+  const flipped    = isF ? convexFlippedF : convexFlippedG;
+  const colors     = isF ? fColors : gColors;
+  const otherFlipped = isF ? convexFlippedG : convexFlippedF;
 
   if (!convex || convex.length === 0 || peakIdx === null) return;
-  
+
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  
-  // Draw the original convex shape in main color
-  ctx.strokeStyle = colors.main;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
 
-  // First point
-  const firstPoint = convex[0];
-  const firstScreen = normalizedToScreen(firstPoint[0], firstPoint[1]);
-  ctx.moveTo(firstScreen.x, firstScreen.y);
-
-  // Remaining points
-  for (let i = 1; i < convex.length; i++) {
-    const point = convex[i];
-    const screen = normalizedToScreen(point[0], point[1]);
-    ctx.lineTo(screen.x, screen.y);
-  }
-
-  ctx.stroke();
-
-  
-  // Draw scaled version if available
-  if (scaled && scaled.length > 0) {
-    ctx.strokeStyle = colors.scaled;
-    ctx.lineWidth = 1;
+  function drawPath(points, style) {
+    if (!points || points.length === 0) return;
+    ctx.strokeStyle = style.color;
+    ctx.lineWidth = style.linewidth || 1;
+    ctx.setLineDash(style.lineDash || []);
     ctx.beginPath();
-    for (let i = 0; i < scaled.length; i++) {
-      const point = scaled[i];
-      const screen = normalizedToScreen(point[0], point[1]);
-      if (i === 0) ctx.moveTo(screen.x, screen.y);
-      else ctx.lineTo(screen.x, screen.y);
-    }
-    ctx.stroke();
-  
-  }
-  
-  // Draw flipped version if available
-  if (flipped && flipped.length > 0) {
-    ctx.strokeStyle = colors.flipped;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    for (let i = 0; i < flipped.length; i++) {
-      const point = flipped[i];
-      const screen = normalizedToScreen(point[0], point[1]);
-      if (i === 0) ctx.moveTo(screen.x, screen.y);
-      else ctx.lineTo(screen.x, screen.y);
+    const start = normalizedToScreen(points[0][0], points[0][1]);
+    ctx.moveTo(start.x, start.y);
+    for (let i = 1; i < points.length; i++) {
+      const p = normalizedToScreen(points[i][0], points[i][1]);
+      ctx.lineTo(p.x, p.y);
     }
     ctx.stroke();
   }
-  
-  // Draw scaled peak
-  const scaledPeak = scaled[peakIdx];
-  const scaledPeakScreen = normalizedToScreen(scaledPeak[0], scaledPeak[1]);
-  ctx.fillStyle = colors.scaledPeak;
-  ctx.beginPath();
-  ctx.arc(scaledPeakScreen.x, scaledPeakScreen.y, 3, 0, 2 * Math.PI);
-  ctx.fill();
+
+  // Draw main convex
+  drawPath(convex, colors.main);
+
+  // Draw scaled version
+  drawPath(scaled, colors.scaled);
+
+  // Draw flipped version
+  drawPath(flipped, colors.flipped);
+
+  // Draw min and max lines if both flipped exist
+  if (flipped && otherFlipped && flipped.length > 0 && otherFlipped.length > 0) {
+    function drawMinOrMaxLine(getY, style) {
+      ctx.strokeStyle = style.color;
+      ctx.lineWidth = style.linewidth || 1;
+      ctx.setLineDash(style.lineDash || []);
+      ctx.beginPath();
+      for (let i = 0; i < flipped.length; i++) {
+        const fPoint = flipped[i];
+        const oPoint = otherFlipped[i];
+        if (!fPoint || !oPoint) continue;
+        const y = getY(fPoint[1], oPoint[1]);
+        const screen = normalizedToScreen(fPoint[0], y);
+        if (i === 0) ctx.moveTo(screen.x, screen.y);
+        else ctx.lineTo(screen.x, screen.y);
+      }
+      ctx.stroke();
+    }
+
+    drawMinOrMaxLine(Math.min, colors.min); 
+    drawMinOrMaxLine(Math.max, colors.max); 
+    ctx.setLineDash([]); 
+  }
+
+  // Draw peak
+  if (scaled?.[peakIdx]) {
+    const peak = scaled[peakIdx];
+    const screen = normalizedToScreen(peak[0], peak[1]);
+    ctx.fillStyle = colors.scaledPeak.color;
+    ctx.beginPath();
+    ctx.arc(screen.x, screen.y, 5, 0, 2 * Math.PI);
+    ctx.fill();
+  }
+
 
   ctx.restore();
-
-  updateEquationLabel() 
+  updateEquationLabel();
 }
-
 
 
 function updateEquationLabel(value) {
   let labelText = '';
 
+  labelText = `<div style="color: black;">`;  // Wrap all in a black-colored container
+
   if (F.length > 0) {
     labelText += `
-      <div style="margin-bottom: 5px;">
-        <strong style="color: ${fColors.main};">f(x)</strong> |
-        <span style="color: ${fColors.scaled};">f(x)<sub>c</sub></span> |
-        <span style="color: ${fColors.flipped};">f(x)<sub>c</sub><sup>Flipped</sup></span> |
-        Convex Peak X: ${convexF[peakIdxF]?.[0]?.toFixed(2) ?? 'N/A'} |
-        Convex Error: ${errorF.toFixed(4)}
+      <div>
+        <span style="position: relative; display: inline-block; padding: 0 6px; line-height: 1.2; border-bottom: ${fColors.raw.linewidth || 2}px solid ${fColors.raw.color};">
+          f(x)
+          <span style="
+            position: absolute;
+            bottom: 0; /* aligns with the bottom border */
+            left: 50%;
+            transform: translate(-50%, 50%);
+            width: 6px;
+            height: 6px;
+            background-color: ${fColors.raw.color};
+            border-radius: 50%;
+            pointer-events: none;
+          "></span>
+        </span>
+        |
+        <span style="border-bottom: ${fColors.scaled.linewidth || 2}px solid ${fColors.scaled.color}; padding: 2px;">
+          f(x)<sub>c</sub>
+        </span>
+        |
+        <span style="border-bottom: ${fColors.flipped.linewidth || 2}px solid ${fColors.flipped.color}; padding: 2px;">
+          f(x)<sub>c</sub><sup>Flipped</sup>
+        </span>
+        |
+        <span style="display: inline-flex; align-items: center;">
+          <span style="
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: ${fColors.scaledPeak.color};
+            margin-right: 5px;
+          "></span>
+          Convex Peak X: ${convexF?.[peakIdxF]?.[0]?.toFixed(2) ?? 'N/A'}
+        </span>
+        |
+        <span>
+          Convex Error: ${errorF?.toFixed(4) ?? 'N/A'}
+        </span>
       </div>
     `;
+
+
   }
 
   if (G.length > 0) {
     labelText += `
-      <div style="margin-bottom: 5px;">
-        <strong style="color: ${gColors.main};">g(x)</strong> |
-        <span style="color: ${gColors.scaled};">g(x)<sub>c</sub></span> |
-        <span style="color: ${gColors.flipped};">g(x)<sub>c</sub><sup>Flipped</sup></span> |
-        Convex Peak X: ${convexG[peakIdxG]?.[0]?.toFixed(2) ?? 'N/A'} |
-        Convex Error: ${errorG.toFixed(4)}
+      <div>
+        <span style="position: relative; display: inline-block; padding: 0 6px; line-height: 1.2; border-bottom: ${gColors.raw.linewidth || 2}px solid ${gColors.raw.color};">
+          g(x)
+          <span style="
+            position: absolute;
+            bottom: 0; /* aligns with the bottom border */
+            left: 50%;
+            transform: translate(-50%, 50%);
+            width: 6px;
+            height: 6px;
+            background-color: ${gColors.raw.color};
+            border-radius: 50%;
+            pointer-events: none;
+          "></span>
+        </span>
+        |
+        <span style="border-bottom: ${gColors.scaled.linewidth || 2}px solid ${gColors.scaled.color}; padding: 2px;">
+          g(x)<sub>c</sub>
+        </span>
+        |
+        <span style="border-bottom: ${gColors.flipped.linewidth || 2}px solid ${gColors.flipped.color}; padding: 2px;">
+          g(x)<sub>c</sub><sup>Flipped</sup>
+        </span>
+        |
+        <span style="display: inline-flex; align-items: center;">
+          <span style="
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: ${gColors.scaledPeak.color};
+            margin-right: 5px;
+          "></span>
+          Convex Peak X: ${convexG?.[peakIdxG]?.[0]?.toFixed(2) ?? 'N/A'}
+        </span>
+        |
+        <span>
+          Convex Error: ${errorG?.toFixed(4) ?? 'N/A'}
+        </span>
       </div>
     `;
+
+
+    if (convexFlippedG && convexFlippedF) {
+      labelText += `
+        <div">
+          <span style="
+            padding: 2px 6px;
+            border-bottom: ${gColors.max.linewidth || 2}px ${gColors.max.lineDash ? 'dashed' : 'solid'} ${gColors.max.color};
+          "> max{f<sub>c</sub><sup>Flipped</sup>, g<sub>c</sub><sup>Flipped</sup>}(x)
+          </span>
+          |
+          <span style="
+            padding: 2px 6px;
+            border-bottom: ${gColors.min.linewidth || 2}px ${gColors.min.lineDash ? 'dashed' : 'solid'} ${gColors.min.color};
+          "> min{f<sub>c</sub><sup>Flipped</sup>, g<sub>c</sub><sup>Flipped</sup>}(x)
+          </span>
+          
+        </div>
+      `;
+    }
   }
+
+
+  labelText += `</div>`; // Close the black color container
 
   eqnLabel.innerHTML = labelText;
 }
@@ -1099,7 +1196,8 @@ function drawMouseCoordinates() {
   ctx.fillRect(labelX - 2, labelY - 12, 100, 15);
   
   // Draw coordinates
-  ctx.fillStyle = drawing ? '#1e81b0' : '#000';
+  let color = currentFunc == 'f'? '#1e81b0': '#ff7f00'; 
+  ctx.fillStyle = drawing ? color : '#000';
   ctx.font = '12px Arial';
   ctx.fillText(
     `(${currentMousePos.x.toFixed(2)}, ${currentMousePos.y.toFixed(2)})`,
@@ -1144,25 +1242,32 @@ function redrawCanvas() {
   // Restore normal drawing
   ctx.restore();
   
-  // Draw grid and axes (in transformed space)
+  // Draw grid and axes (
   drawGridLines();
   drawAxes();
   
-  // Draw function f (blue)
-  if (F.length > 0) {
-    drawPoints(F, '#1e81b0');
+
+  // Draw convex approx
+  if(!drawing){
     if (convexF.length > 0) {
       drawConvexApproximation('f');
     }
+    if (convexG.length > 0) {
+      drawConvexApproximation('g');
+    }
+  }
+
+  // Draw function f (blue)
+ 
+  if (F.length > 0) {
+    drawPoints(F, '#1e81b0');
   }
   
   // Draw function g (orange)
   if (G.length > 0) {
     drawPoints(G, '#ff7f00');
-    if (convexG.length > 0) {
-      drawConvexApproximation('g');
-    }
   }
+  
 
   // Draw mouse coordinates (always in screen space)
   drawMouseCoordinates();
@@ -1364,14 +1469,45 @@ toolbar.addEventListener('mousemove', (e) => {
 });
 
 
+// Table scrolling
+tableScroll.addEventListener('mousedown', (e) => {
+  tableIsDown = true;
+  tableScroll.style.cursor = 'grabbing';
+  tableScroll.style.userSelect = 'none';
+  tableStartX = e.pageX - tableScroll.getBoundingClientRect().left;
+  tableScrollLeft = tableScroll.scrollLeft;
+});
+
+document.addEventListener('mouseup', () => {
+  tableIsDown = false;
+  tableScroll.style.cursor = '';
+  tableScroll.style.userSelect = '';
+});
+
+document.addEventListener('mouseleave', () => {
+  tableIsDown = false;
+  tableScroll.style.cursor = '';
+  tableScroll.style.userSelect = '';
+});
+
+tableScroll.addEventListener('mousemove', (e) => {
+  if (!tableIsDown) return;
+  e.preventDefault();
+  const x = e.pageX - tableScroll.getBoundingClientRect().left;
+  const walk = (x - tableStartX) * 2;
+  tableScroll.scrollLeft = tableScrollLeft - walk;
+});
+
+
 // Toolbar buttons
 document.getElementById('handTool').addEventListener('click', toggleHandTool);
 document.getElementById('zoomIn').addEventListener('click', () => zoomCanvas(1.2));
 document.getElementById('zoomOut').addEventListener('click', () => zoomCanvas(0.8));
 document.getElementById('resetView').addEventListener('click', resetView);
 document.getElementById('clearBtn').addEventListener('click', () => {
-  F = [];
-  G = [];
+  clearFuncVars('f')
+  clearFuncVars('g')
+  eqnLabel.textContent = '';
   tableBody.innerHTML = '';
   redrawCanvas();
   resetView();

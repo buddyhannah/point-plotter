@@ -61,7 +61,7 @@ canvas {
 table {
   margin: 2rem auto;
   border-collapse: collapse;
-  width: 90%;
+  width: 100%;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   border-radius: 8px;
   overflow: hidden;
@@ -79,7 +79,7 @@ th {
   background-color: #2d2d2e; 
   color: white;
   font-weight: 600;
-  font-size: 1rem;
+  font-size: .85rem;
   letter-spacing: 0.5px;
 }
 
@@ -122,6 +122,11 @@ thead {
 }
 .table-scroll-container::-webkit-scrollbar-track {
   background: transparent;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  cursor: grab;
 }
 
 
@@ -243,16 +248,6 @@ input[type="number"]:focus {
   canvas {
     width: 95%;
     height: 50vh;
-  }
-
-  /* Table */
-  table {
-    width: 80%;
-    font-size:18px;
-  }
-  
-  th, td {
-    padding: 8px 10px;
   }
 
   /* Scrollable tool bar */
