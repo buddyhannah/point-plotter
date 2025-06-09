@@ -59,15 +59,13 @@ let errorG = null;
 let convexFlippedF = [];
 let convexFlippedG = [];
 
-// Color schemes
+
 const gColors = {
   raw:        { color: 'rgb(255, 100, 0)',     linewidth: 1 },
   main:       { color: 'rgba(255, 187, 160, 0.6)', linewidth: 2.5 },
   scaled:     { color: 'rgb(255, 190, 80)',    linewidth: 1 },
   scaledPeak: { color: 'rgb(180, 40, 0)' },
   flipped:    { color: 'rgb(255, 150, 40)',    linewidth: 1 },
-  min:        { color: '#00ff00', linewidth: 6, lineDash: [2, 2] }, // Bright green, very visible
-  max:        { color: '#ff00ff', linewidth: 6, lineDash: [1, 4] }  // Bright magenta for contrast
 };
 
 const fColors = {
@@ -76,10 +74,17 @@ const fColors = {
   scaled:     { color: 'rgb(80, 200, 210)',    linewidth: 1 },
   scaledPeak: { color: 'rgb(0, 60, 120)' },
   flipped:    { color: 'rgb(40, 140, 220)',    linewidth: 1 },
-  min:        { color: '#00ff00', linewidth: 6, lineDash: [2, 2] },
-  max:        { color: '#ff00ff', linewidth: 6, lineDash: [1, 4] }
 };
 
+const fgColors = {
+  minFlipped:   { color: 'rgb(0,255,0)', linewidth: 3, lineDash: [2, 2] },
+  maxFlipped:   { color: 'rgb(255,0,255)', linewidth: 3, lineDash: [2, 2] },
+  scaledUnion:  { color: 'rgb(26,188,156)', linewidth: 5, lineDash: [2, 4] },
+  scaledIntersection:  { color: 'rgb(231,76,60)', linewidth: 5, lineDash: [2, 4] },
+  leftEnvelope:  { color: 'rgba(0, 0, 0, 0.3)', linewidth: 1 },
+  rightEnvelope: { color: 'rgba(0, 0, 0, 0.3)', linewidth: 1 }
+
+}
 
 
 
@@ -524,12 +529,22 @@ function endDraw(e) {
 }
 
 
-/*
-  Draws the convex approximation with:
-  - The original increasing and decreasing segments
-  - The decreasing segment flipped vertically
-*/
-// convexF, peakIdxF, convexScaledF, convexFlippedF, '#1e81b0'
+
+function drawPath(points, style) {
+  if (!points || points.length === 0) return;
+  ctx.strokeStyle = style.color;
+  ctx.lineWidth = style.linewidth || 1;
+  ctx.setLineDash(style.lineDash || []);
+  ctx.beginPath();
+  const start = normalizedToScreen(points[0][0], points[0][1]);
+  ctx.moveTo(start.x, start.y);
+  for (let i = 1; i < points.length; i++) {
+    const p = normalizedToScreen(points[i][0], points[i][1]);
+    ctx.lineTo(p.x, p.y);
+  }
+  ctx.stroke();
+}
+
 /*
   Draws the convex approximation with:
   - The original increasing and decreasing segments
@@ -542,80 +557,128 @@ function drawConvexApproximation(label) {
   const isG = label === 'g';
   if (!isF && !isG) return;
 
-  const convex     = isF ? convexF : convexG;
-  const peakIdx    = isF ? peakIdxF : peakIdxG;
-  const scaled     = isF ? convexScaledF : convexScaledG;
-  const flipped    = isF ? convexFlippedF : convexFlippedG;
-  const colors     = isF ? fColors : gColors;
-  const otherFlipped = isF ? convexFlippedG : convexFlippedF;
+  const convex        = isF ? convexF : convexG;
+  const peakIdx       = isF ? peakIdxF : peakIdxG;
+  const scaled        = isF ? convexScaledF : convexScaledG;
+  const flipped       = isF ? convexFlippedF : convexFlippedG;
+  const colors        = isF ? fColors : gColors;
+  const otherFlipped  = isF ? convexFlippedG : convexFlippedF;
+  const otherScaled   = isF ? convexScaledG : convexScaledF;
 
   if (!convex || convex.length === 0 || peakIdx === null) return;
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  function drawPath(points, style) {
-    if (!points || points.length === 0) return;
-    ctx.strokeStyle = style.color;
-    ctx.lineWidth = style.linewidth || 1;
-    ctx.setLineDash(style.lineDash || []);
-    ctx.beginPath();
-    const start = normalizedToScreen(points[0][0], points[0][1]);
-    ctx.moveTo(start.x, start.y);
-    for (let i = 1; i < points.length; i++) {
-      const p = normalizedToScreen(points[i][0], points[i][1]);
-      ctx.lineTo(p.x, p.y);
-    }
-    ctx.stroke();
+  // Draw min and max lines if both flipped exist
+  if (false && flipped.length > 0 && otherFlipped.length > 0) {
+      drawMinMax(flipped,otherFlipped)
+     // Draw peak of scaled
+      if (scaled?.[peakIdx]) {
+        const peak = scaled[peakIdx];
+        const screen = normalizedToScreen(peak[0], peak[1]);
+        ctx.fillStyle = colors.scaledPeak.color;
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y, 5, 0, 2 * Math.PI);
+        ctx.fill();
+    } 
+
+    // Draw flipped
+    drawPath(flipped, colors.flipped);
   }
 
-  // Draw main convex
-  drawPath(convex, colors.main);
+  if (scaled.length > 0 && otherScaled.length > 0) {
+    drawJoinMeet(scaled, otherScaled);
 
-  // Draw scaled version
+  }
+
+  // Draw main convex, scaled, 
+  drawPath(convex, colors.main);
   drawPath(scaled, colors.scaled);
 
-  // Draw flipped version
-  drawPath(flipped, colors.flipped);
-
-  // Draw min and max lines if both flipped exist
-  if (flipped && otherFlipped && flipped.length > 0 && otherFlipped.length > 0) {
-    function drawMinOrMaxLine(getY, style) {
-      ctx.strokeStyle = style.color;
-      ctx.lineWidth = style.linewidth || 1;
-      ctx.setLineDash(style.lineDash || []);
-      ctx.beginPath();
-      for (let i = 0; i < flipped.length; i++) {
-        const fPoint = flipped[i];
-        const oPoint = otherFlipped[i];
-        if (!fPoint || !oPoint) continue;
-        const y = getY(fPoint[1], oPoint[1]);
-        const screen = normalizedToScreen(fPoint[0], y);
-        if (i === 0) ctx.moveTo(screen.x, screen.y);
-        else ctx.lineTo(screen.x, screen.y);
-      }
-      ctx.stroke();
-    }
-
-    drawMinOrMaxLine(Math.min, colors.min); 
-    drawMinOrMaxLine(Math.max, colors.max); 
-    ctx.setLineDash([]); 
-  }
-
-  // Draw peak
-  if (scaled?.[peakIdx]) {
-    const peak = scaled[peakIdx];
-    const screen = normalizedToScreen(peak[0], peak[1]);
-    ctx.fillStyle = colors.scaledPeak.color;
-    ctx.beginPath();
-    ctx.arc(screen.x, screen.y, 5, 0, 2 * Math.PI);
-    ctx.fill();
-  }
-
-
+ 
   ctx.restore();
   updateEquationLabel();
 }
+
+function drawMinMax(flipped, otherFlipped){
+
+  const minPoints = [];
+  const maxPoints = [];
+
+  for (let i = 0; i < flipped.length; i++) {
+    const fPoint = flipped[i];
+    const oPoint = otherFlipped[i];
+    if (!fPoint || !oPoint) continue;
+    const x = fPoint[0];
+    const minY = Math.min(fPoint[1], oPoint[1]);
+    const maxY = Math.max(fPoint[1], oPoint[1]);
+    minPoints.push([x, minY]);
+    maxPoints.push([x, maxY]);
+  }
+
+  drawPath(minPoints, fgColors.minFlipped);
+  drawPath(maxPoints, fgColors.maxFlipped);
+
+  const flippedMin = flipVertically(minPoints);
+  const flippedMax = flipVertically(maxPoints);
+  const flippedMinStyle = { ...fgColors.minFlipped, lineDash: [1, 4] }; 
+  const flippedMaxStyle = { ...fgColors.maxFlipped, lineDash: [1, 4] };
+
+  drawPath(flippedMin, flippedMinStyle);
+  drawPath(flippedMax, flippedMaxStyle);
+  ctx.setLineDash([]);
+}
+
+function drawJoinMeet(scaled, otherScaled) {
+  // Join = (f ∨ g) ∧ (fL ∧ gL)
+  // Meet = (f ∧ g) ∨ (fR ∧ gR)
+
+  const pointwiseMax = scaled.map(([x, y1], i) => {
+    const [, y2] = otherScaled[i];
+    return [x, Math.max(y1, y2)];
+  });
+
+  const pointwiseMin = scaled.map(([x, y1], i) => {
+    const [, y2] = otherScaled[i];
+    return [x, Math.min(y1, y2)];
+  });
+
+  const fLeft = calculateLeftEnvelope(scaled);
+  const gLeft = calculateLeftEnvelope(otherScaled);
+  const leftEnvelope = fLeft.map(([x, y1], i) => {
+    const [, y2] = gLeft[i];
+    return [x, Math.min(y1, y2)];
+  });
+
+  const fRight = calculateRightEnvelope(scaled);
+  const gRight = calculateRightEnvelope(otherScaled);
+  const rightEnvelope = fRight.map(([x, y1], i) => {
+    const [, y2] = gRight[i];
+    return [x, Math.min(y1, y2)];
+  });
+
+  const join = pointwiseMax.map(([x, y1], i) => {
+    const [, y2] = leftEnvelope[i];
+    return [x, Math.min(y1, y2)];
+  });
+
+  const meet = pointwiseMin.map(([x, y1], i) => {
+    const [, y2] = rightEnvelope[i];
+    return [x, Math.max(y1, y2)];
+  });
+
+  drawPath(pointwiseMax, fgColors.scaledUnion);
+  drawPath(pointwiseMin, fgColors.scaledIntersection);
+
+  drawPath(fLeft, fgColors.leftEnvelope);
+  drawPath(gLeft, fgColors.rightEnvelope);
+
+  drawPath(join, { color: 'blue', linewidth: 2 });
+  drawPath(meet, { color: 'purple', linewidth: 2 });
+
+}
+
 
 
 function updateEquationLabel(value) {
@@ -720,13 +783,13 @@ function updateEquationLabel(value) {
         <div">
           <span style="
             padding: 2px 6px;
-            border-bottom: ${gColors.max.linewidth || 2}px ${gColors.max.lineDash ? 'dashed' : 'solid'} ${gColors.max.color};
+            border-bottom: ${fgColors.maxFlipped.linewidth || 2}px ${fgColors.maxFlipped.lineDash ? 'dashed' : 'solid'} ${fgColors.maxFlipped.color};
           "> max{f<sub>c</sub><sup>Flipped</sup>, g<sub>c</sub><sup>Flipped</sup>}(x)
           </span>
           |
           <span style="
             padding: 2px 6px;
-            border-bottom: ${gColors.min.linewidth || 2}px ${gColors.min.lineDash ? 'dashed' : 'solid'} ${gColors.min.color};
+            border-bottom: ${fgColors.minFlipped.linewidth || 2}px ${fgColors.minFlipped.lineDash ? 'dashed' : 'solid'} ${fgColors.minFlipped.color};
           "> min{f<sub>c</sub><sup>Flipped</sup>, g<sub>c</sub><sup>Flipped</sup>}(x)
           </span>
           
@@ -848,8 +911,8 @@ function solveConvexRegression(points) {
     const rightFitY = isotonicRegression(rightX, rightY, false); // Decreasing
 
     // Calculate error
-    const leftError = calculateError(leftFitY, leftY);
-    const rightError = calculateError(rightFitY, rightY);
+    const leftError = calculateError(leftY, leftFitY);
+    const rightError = calculateError(rightY, rightFitY);
     const error = leftError + rightError;
 
     
@@ -924,24 +987,50 @@ function flipIncreasingPart(f, peakIdx) {
 
 
 /**
- * Flips the entire graph vertically by calculating 2 - x for each point
- * @param {Array} points - Array of {x, y} points
- * @returns {Array} Horizontally flipped array of {x, y} points
+ * Flips the graph vertically (around y = 1) only for points where y > 1.
+ * @param {Array} points - Array of [x, y] points
+ * @returns {Array} Conditionally flipped array of [x, y] points
  */
 function flipVertically(points) {
-  return points.map(point => ({
-    x: point.x,
-    y: 2 - point.y
-  }));
+  return points.map(([x, y]) => {
+    return y > 1 ? [x, 2 - y] : [x, y];
+  });
 }
 
 
-/*
-  Helper method for solveonvexRegression to
+
+/**
+ * Helper method for solveonvexRegression to
   calculate the squared error between the predicted and actual y-value
-*/
+ * @param {Array} actual - array of actual y-values
+ * @param {Array} predicted - array of predicted y-values
+ * @returns the squared error between the predicted and actual y-value
+ */
 function calculateError(actual, predicted) {
   return actual.reduce((sum, y, i) => sum + Math.pow(y - predicted[i], 2), 0);
+}
+
+
+
+function calculateLeftEnvelope(points) {
+  const envelope = [];
+  let currentMax = -Infinity;
+  for (const [x, y] of points) {
+    currentMax = Math.max(currentMax, y); // Keeps track of the running maximum
+    envelope.push([x, currentMax]);      // Ensures the function is non-decreasing
+  }
+  return envelope;
+}
+
+function calculateRightEnvelope(points) {
+  const envelope = [];
+  let currentMin = Infinity;
+  for (let i = points.length - 1; i >= 0; i--) {
+    const [x, y] = points[i];
+    currentMin = Math.min(currentMin, y); // Keeps track of the running minimum
+    envelope.unshift([x, currentMin]);    // Ensures the function is non-increasing
+  }
+  return envelope;
 }
 
 // **************************************************
@@ -1196,7 +1285,7 @@ function drawMouseCoordinates() {
   ctx.fillRect(labelX - 2, labelY - 12, 100, 15);
   
   // Draw coordinates
-  let color = currentFunc == 'f'? '#1e81b0': '#ff7f00'; 
+  let color = currentFunc == 'f'? fColors.raw.color: gColors.raw.color; 
   ctx.fillStyle = drawing ? color : '#000';
   ctx.font = '12px Arial';
   ctx.fillText(
@@ -1260,12 +1349,12 @@ function redrawCanvas() {
   // Draw function f (blue)
  
   if (F.length > 0) {
-    drawPoints(F, '#1e81b0');
+    drawPoints(F, fColors.raw.color);
   }
   
   // Draw function g (orange)
   if (G.length > 0) {
-    drawPoints(G, '#ff7f00');
+    drawPoints(G, gColors.raw.color);
   }
   
 
