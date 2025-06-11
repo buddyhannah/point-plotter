@@ -1377,6 +1377,46 @@ function manipulateGraph(func) {
 function updateTable() {
   tableBody.innerHTML = ''; // Clear previous table
 
+  // Get all checked boxes
+  const checkedOptions = {};
+  document.querySelectorAll('#graph-controls input[type="checkbox"]:checked').forEach(checkbox => {
+    checkedOptions[checkbox.id] = true;
+  });
+
+  // Create header row based on checked options
+  const headerRow = document.querySelector('table thead tr');
+  headerRow.innerHTML = '<th>x</th>'; // Start with just x column
+
+  // Helper function to add header if option is checked
+  const addHeaderIfChecked = (id, headerHtml) => {
+    if (checkedOptions[id]) {
+      const th = document.createElement('th');
+      th.innerHTML = headerHtml;
+      headerRow.appendChild(th);
+    }
+  };
+
+  // Add headers for each possible column
+  addHeaderIfChecked('show-f', 'f(x)');
+  addHeaderIfChecked('show-g', 'g(x)');
+  addHeaderIfChecked('show-convexF', 'f(x)<sub>c</sub>');
+  addHeaderIfChecked('show-convexG', 'g(x)<sub>c</sub>');
+  addHeaderIfChecked('show-flippedF', 'f(x)<sub>c</sub><sup>Flip</sup>');
+  addHeaderIfChecked('show-flippedG', 'g(x)<sub>c</sub><sup>Flip</sup>');
+  addHeaderIfChecked('show-flippedMin', 'min{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}(x)');
+  addHeaderIfChecked('show-flippedMax', 'max{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}(x)');
+  addHeaderIfChecked('show-unflippedMin', 'min{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}(x)<sup>Unflip</sup>');
+  addHeaderIfChecked('show-unflippedMax', 'max{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}(x)<sup>Unflip</sup>');
+  addHeaderIfChecked('show-pwIntersect', 'f ∧ g');
+  addHeaderIfChecked('show-pwUnion', 'f ∨ g');
+  addHeaderIfChecked('show-fLeft', 'f<sup>L</sup>');
+  addHeaderIfChecked('show-gLeft', 'g<sup>L</sup>');
+  addHeaderIfChecked('show-fRight', 'f<sup>R</sup>');
+  addHeaderIfChecked('show-gRight', 'g<sup>R</sup>');
+  addHeaderIfChecked('show-join', 'f ⊔ g');
+  addHeaderIfChecked('show-meet', 'f ⊓ g');
+ 
+
   // x = 0, 0.01, ..., 1
   for (let i = 0; i <= 100; i++) {
     const x = (i / 100).toFixed(2);
@@ -1406,60 +1446,25 @@ function updateTable() {
       return td;
     };
 
-    // Original functions
-    row.appendChild(addYCell(F[i]));
-    row.appendChild(addYCell(G[i]));
-
-    // Scaled convex approximations
-    row.appendChild(addYCell(convexScaledF[i]));
-    row.appendChild(addYCell(convexScaledG[i]));
-
-    // Flipped convex functions
-    const cff = convexFlippedF[i];
-    const cfg = convexFlippedG[i];
-    row.appendChild(addYCell(cff));
-    row.appendChild(addYCell(cfg));
-
-    // Min/max flipped
-    const min =  minPoints[i]
-    const max =  maxPoints[i]
-    console.log(minPoints[i]);
-    row.appendChild(addYCell(min));
-    row.appendChild(addYCell(max));
-
-    // Min/max unflipped
-    const uMin =  unflippedMin[i]
-    const uMax =  unflippedMax[i]
-    console.log(minPoints[i]);
-    row.appendChild(addYCell(uMin));
-    row.appendChild(addYCell(uMax));
-
-    // union/intersection
-    const intersect =  pointwiseMin[i]
-    const union =  pointwiseMax[i]
-    row.appendChild(addYCell(intersect));
-    row.appendChild(addYCell(union));
-    
-
-    // Least increasing/decreasing
-    const fL = fLeft[i]
-    const gL = gLeft[i]
-    const fR = fRight[i]
-    const gR = gRight[i]
-    row.appendChild(addYCell(fL));
-    row.appendChild(addYCell(gL));
-    row.appendChild(addYCell(fR));
-    row.appendChild(addYCell(gR));
-
-
-    // Join and meet
-    const myJoin = join[i];
-    const myMeet = meet[i];
-    row.appendChild(addYCell(myJoin));
-    row.appendChild(addYCell(myMeet));
-
-
-
+    // Add cells for each checked option in the same order as headers
+    if (checkedOptions['show-f']) row.appendChild(addYCell(F[i]));
+    if (checkedOptions['show-g']) row.appendChild(addYCell(G[i]));
+    if (checkedOptions['show-convexF']) row.appendChild(addYCell(convexScaledF[i]));
+    if (checkedOptions['show-convexG']) row.appendChild(addYCell(convexScaledG[i]));
+    if (checkedOptions['show-flippedF']) row.appendChild(addYCell(convexFlippedF[i]));
+    if (checkedOptions['show-flippedG']) row.appendChild(addYCell(convexFlippedG[i]));
+    if (checkedOptions['show-flippedMin']) row.appendChild(addYCell(minPoints[i]));
+    if (checkedOptions['show-flippedMax']) row.appendChild(addYCell(maxPoints[i]));
+    if (checkedOptions['show-unflippedMin']) row.appendChild(addYCell(unflippedMin[i]));
+    if (checkedOptions['show-unflippedMax']) row.appendChild(addYCell(unflippedMax[i]));
+    if (checkedOptions['show-pwIntersect']) row.appendChild(addYCell(pointwiseMin[i]));
+    if (checkedOptions['show-pwUnion']) row.appendChild(addYCell(pointwiseMax[i]));
+    if (checkedOptions['show-fLeft']) row.appendChild(addYCell(fLeft[i]));
+    if (checkedOptions['show-gLeft']) row.appendChild(addYCell(gLeft[i]));
+    if (checkedOptions['show-fRight']) row.appendChild(addYCell(fRight[i]));
+    if (checkedOptions['show-gRight']) row.appendChild(addYCell(gRight[i]));
+    if (checkedOptions['show-join']) row.appendChild(addYCell(join[i]));
+    if (checkedOptions['show-meet']) row.appendChild(addYCell(meet[i]));
 
     tableBody.appendChild(row);
   }
@@ -1839,6 +1844,7 @@ window.addEventListener('load', () => {
   createControlPanel();
   document.querySelectorAll('#graph-controls input').forEach(checkbox => {
     checkbox.addEventListener('change', redrawCanvas);
+    checkbox.addEventListener('change', updateTable);
   });
 
   // Default to checked
