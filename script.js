@@ -654,8 +654,8 @@ function createControlPanel() {
     {
       heading: 'Union & Intersection',
       options: [
+        { id: 'show-pwIntersect', label: 'f ∧ g' },
         { id: 'show-pwUnion', label: 'f ∨ g' },
-        { id: 'show-pwIntersect', label: 'f ∧ g' }
       ]
     },
     {
@@ -1397,24 +1397,24 @@ function updateTable() {
   };
 
   // Add headers for each possible column
-  addHeaderIfChecked('show-f', 'f(x)');
-  addHeaderIfChecked('show-g', 'g(x)');
-  addHeaderIfChecked('show-convexF', 'f(x)<sub>c</sub>');
-  addHeaderIfChecked('show-convexG', 'g(x)<sub>c</sub>');
-  addHeaderIfChecked('show-flippedF', 'f(x)<sub>c</sub><sup>Flip</sup>');
-  addHeaderIfChecked('show-flippedG', 'g(x)<sub>c</sub><sup>Flip</sup>');
-  addHeaderIfChecked('show-flippedMin', 'min{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}(x)');
-  addHeaderIfChecked('show-flippedMax', 'max{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}(x)');
-  addHeaderIfChecked('show-unflippedMin', 'min{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}(x)<sup>Unflip</sup>');
-  addHeaderIfChecked('show-unflippedMax', 'max{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}(x)<sup>Unflip</sup>');
-  addHeaderIfChecked('show-pwIntersect', 'f ∧ g');
-  addHeaderIfChecked('show-pwUnion', 'f ∨ g');
-  addHeaderIfChecked('show-fLeft', 'f<sup>L</sup>');
-  addHeaderIfChecked('show-gLeft', 'g<sup>L</sup>');
-  addHeaderIfChecked('show-fRight', 'f<sup>R</sup>');
-  addHeaderIfChecked('show-gRight', 'g<sup>R</sup>');
-  addHeaderIfChecked('show-join', 'f ⊔ g');
-  addHeaderIfChecked('show-meet', 'f ⊓ g');
+  addHeaderIfChecked('show-f', 'f');
+  addHeaderIfChecked('show-g', 'g');
+  addHeaderIfChecked('show-convexF', 'f<sub>c</sub>');
+  addHeaderIfChecked('show-convexG', 'g<sub>c</sub>');
+  addHeaderIfChecked('show-flippedF', 'f<sub>c</sub><sup>Flip</sup>');
+  addHeaderIfChecked('show-flippedG', 'g<sub>c</sub><sup>Flip</sup>');
+  addHeaderIfChecked('show-flippedMin', 'min{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}');
+  addHeaderIfChecked('show-flippedMax', 'max{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}');
+  addHeaderIfChecked('show-unflippedMin', 'min{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}<sup>Unflip</sup>');
+  addHeaderIfChecked('show-unflippedMax', 'max{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}<sup>Unflip</sup>');
+  addHeaderIfChecked('show-pwIntersect', 'f ∧ g = min{f, g}');
+  addHeaderIfChecked('show-pwUnion', 'f ∨ g = max{f, g}');
+  addHeaderIfChecked('show-fLeft', 'f<sup>L</sup> (least incr.)');
+  addHeaderIfChecked('show-gLeft', 'g<sup>L</sup> (least incr.)');
+  addHeaderIfChecked('show-fRight', 'f<sup>R</sup> (least decr.)');
+  addHeaderIfChecked('show-gRight', 'g<sup>R</sup> (least decr.)');
+  addHeaderIfChecked('show-join', 'f ⊔ g = (f ∨ g) ∧ (f<sup>L</sup> ∧ g<sup>L</sup>)');
+  addHeaderIfChecked('show-meet', 'f ⊓ g = (f ∨ g) ∧ (f<sup>R</sup> ∧ g<sup>R</sup>)');
  
 
   // x = 0, 0.01, ..., 1
@@ -1791,6 +1791,30 @@ tableScroll.addEventListener('mousemove', (e) => {
   const walk = (x - tableStartX) * 2;
   tableScroll.scrollLeft = tableScrollLeft - walk;
 });
+
+// Table gradient
+function updateMask() {
+  const outer = document.querySelector('.table-scroll-container');
+  const inner = document.querySelector('.table-scroll');
+  if (!outer || !inner) return;
+
+  if (inner.scrollWidth > outer.clientWidth) {
+    outer.classList.add('scrollable');
+  } else {
+    outer.classList.remove('scrollable');
+  }
+}
+
+window.addEventListener('resize', updateMask);
+window.addEventListener('load', () => {
+  setTimeout(updateMask, 100); // allow layout to stabilize
+});
+
+const observer = new MutationObserver(updateMask);
+if (tableBody) {
+  observer.observe(tableBody, { childList: true, subtree: true });
+}
+
 
 
 // Toolbar buttons

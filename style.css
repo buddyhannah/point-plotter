@@ -83,7 +83,11 @@ th {
   font-weight: 600;
   font-size: .85rem;
   letter-spacing: 0.5px;
+  white-space: nowrap;       
+  overflow: hidden;          
+  text-overflow: ellipsis;   
 }
+
 
 td {
   color: #333;
@@ -106,6 +110,7 @@ thead {
 
 .table-scroll-container {
   width: 100%;
+  max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   margin: 2rem auto;
@@ -113,7 +118,13 @@ thead {
   -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
   scrollbar-width: thin;
   scrollbar-color: #ccc transparent;
+  position: relative;
+
+  /* Gradient mask */
+  mask-image: none;
+  -webkit-mask-image: none;
 }
+
 
 .table-scroll-container::-webkit-scrollbar {
   height: 8px;
@@ -131,6 +142,22 @@ thead {
   cursor: grab;
 }
 
+.table-scroll-container.scrollable {
+  mask-image: linear-gradient(
+    to right,
+    transparent 0px,
+    black 20px,
+    black calc(100% - 20px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0px,
+    black 20px,
+    black calc(100% - 20px),
+    transparent 100%
+  );
+}
 
 
 
