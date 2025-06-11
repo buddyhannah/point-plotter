@@ -41,6 +41,8 @@ const FINAL_ZOOM = 1;
 /** 'f', 'g', or 'h' */
 let currentFunc = 'f'; 
 
+
+// Proccessed input
 let F = [];
 let G = [];
 
@@ -58,6 +60,26 @@ let errorG = null;
 // Flipped Convex approx.
 let convexFlippedF = [];
 let convexFlippedG = [];
+
+// Least increasing/decreasing
+let fLeft = [];
+let fRight = [];
+
+let gLeft = [];
+let gRight = [];
+
+// Union/Intersection
+let pointwiseMax = []
+let pointwiseMin = []
+
+let join = []
+let meet = []
+
+// min/max
+let minPoints = [];
+let maxPoints= [];
+let unflippedMin = [];
+let unflippedMax = [];
 
 
 const gColors = {
@@ -565,6 +587,7 @@ function createControlPanel() {
   const existing = document.getElementById('graph-controls');
   if (existing) return;
 
+
   // Toggle button
   const toggleButton = document.createElement('button');
   toggleButton.id = 'control-toggle';
@@ -580,6 +603,8 @@ function createControlPanel() {
   toggleButton.style.border = 'none';
   toggleButton.style.cursor = 'pointer';
   toggleButton.style.fontSize = '20px';
+  toggleButton.style.top = '20px';
+  toggleButton.style.right = '20px';
   document.body.appendChild(toggleButton);
 
   // Panel container
@@ -605,19 +630,19 @@ function createControlPanel() {
   
   const groups = [
     {
-      heading: 'Basic',
+      heading: 'Original & Convexified Sets',
       options: [
         { id: 'show-f', label: 'f' },
         { id: 'show-g', label: 'g' },
         { id: 'show-convexF', label: 'f<sub>c</sub>' },
         { id: 'show-convexG', label: 'g<sub>c</sub>' },
-        { id: 'show-flippedF', label: 'f<sub>c</sub><sup>Flip</sup>' },
-        { id: 'show-flippedG', label: 'g<sub>c</sub><sup>Flip</sup>' },
       ]
     },
     {
-      heading: 'Min/Max Operations',
+      heading: 'Flipped Min/Max and Their Unflips',
       options: [
+        { id: 'show-flippedF', label: 'f<sub>c</sub><sup>Flip</sup>' },
+        { id: 'show-flippedG', label: 'g<sub>c</sub><sup>Flip</sup>' },
         { id: 'show-flippedMin', label: 'min{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}' },
         { id: 'show-flippedMax', label: 'max{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}' },
         { id: 'show-unflippedMin', label: 'min{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}<sup>Unflip</sup>' },
@@ -627,14 +652,14 @@ function createControlPanel() {
 
     },
     {
-      heading: 'Union/Intersection',
+      heading: 'Union & Intersection',
       options: [
         { id: 'show-pwUnion', label: 'f ∨ g' },
         { id: 'show-pwIntersect', label: 'f ∧ g' }
       ]
     },
     {
-      heading: 'Least Increasing/Decreasing',
+      heading: 'Least Monotonic Functions',
       options: [
         { id: 'show-fLeft', label: 'f<sup>L</sup>' },
         { id: 'show-gLeft', label: 'g<sup>L</sup>' },
@@ -643,10 +668,10 @@ function createControlPanel() {
       ]
     },
     {
-      heading: 'Join/Meet',
+      heading: 'Join & Meet',
       options: [
-        { id: 'show-join', label: 'f ⊔ g (Join)' },
-        { id: 'show-meet', label: 'f ⊓ g (Meet)' }
+        { id: 'show-join', label: 'f ⊔ g' },
+        { id: 'show-meet', label: 'f ⊓ g' }
       ]
     }
   ];
@@ -756,31 +781,14 @@ function drawMinMaxRegions() {
 
   if (!showMin && !showMax & !showUnflippedMin & !showUnflippedMax) return;
 
-  const minPoints = [];
-  const maxPoints = [];
-
-  for (let i = 0; i < convexFlippedF.length; i++) {
-    const fPoint = convexFlippedF[i];
-    const gPoint = convexFlippedG[i];
-    if (!fPoint || !gPoint) continue;
-    
-    const x = fPoint[0];
-    const minY = Math.min(fPoint[1], gPoint[1]);
-    const maxY = Math.max(fPoint[1], gPoint[1]);
-    minPoints.push([x, minY]);
-    maxPoints.push([x, maxY]);
-  }
-
   if (showMin) drawPath(minPoints, fgColors.minFlipped);
   if (showMax) drawPath(maxPoints, fgColors.maxFlipped);
 
   if (showUnflippedMin){
-    const unflippedMin = flipVertically(minPoints)
     drawPath(unflippedMin, fgColors.minUnflipped)
   }
 
   if (showUnflippedMax){
-    const unflippedMax = flipVertically(maxPoints)
     drawPath(unflippedMax, fgColors.maxUnflipped)
   }
 }
@@ -788,13 +796,7 @@ function drawMinMaxRegions() {
 
 function drawJoinMeet() {
   // Calculate all needed operations
-  
-  let fLeft;
-  let fRight;
   if(convexScaledF?.length){
-    fLeft = calculateLeastIncreasing(convexScaledF);
-    fRight = calculateLeastDecreasing(convexScaledF);
-
     if (document.getElementById('show-fLeft')?.checked && fLeft.length) {
       drawPath(fLeft, fColors.left);
     }         
@@ -805,11 +807,7 @@ function drawJoinMeet() {
     
   }
  
-  let gLeft;
-  let gRight;
   if(convexScaledG?.length){
-    gLeft = calculateLeastIncreasing(convexScaledG);
-    gRight = calculateLeastDecreasing(convexScaledG);
 
     if (document.getElementById('show-gLeft')?.checked && gLeft.length) {
       drawPath(gLeft, gColors.left);
@@ -824,18 +822,6 @@ function drawJoinMeet() {
   // Return unless both f and g are populated
   if(!(convexScaledF?.length && convexScaledG?.length)) {return;}
 
-
-  const pointwiseMax = convexScaledF.map(([x, y1], i) => {
-    const [, y2] = convexScaledG[i];
-    return [x, Math.max(y1, y2)];
-  });
-
-  const pointwiseMin = convexScaledF.map(([x, y1], i) => {
-    const [, y2] = convexScaledG[i];
-    return [x, Math.min(y1, y2)];
-  });
-
-  
   if (document.getElementById('show-pwUnion')?.checked) {
     drawPath(pointwiseMax, fgColors.union);
   }
@@ -845,12 +831,10 @@ function drawJoinMeet() {
 
   
   if (document.getElementById('show-join')?.checked && fLeft.length && gLeft.length) {
-    let join = calculateJoin(pointwiseMax, fLeft, gLeft);
     drawPath(join, fgColors.join);
   }
 
   if (document.getElementById('show-meet')?.checked && fRight.length && gRight.length) {
-    let meet = calculateMeet(pointwiseMax, fRight, gRight);
     drawPath(meet, fgColors.meet);
   }
 }
@@ -1322,6 +1306,9 @@ function manipulateGraph(func) {
       errorF = result.error
       convexScaledF = scaled;
       convexFlippedF = flipped
+      fLeft = calculateLeastIncreasing(convexScaledF);
+      fRight = calculateLeastDecreasing(convexScaledF);
+
     }else {
       G = processed
       peakIdxG = result.peakIndex
@@ -1329,8 +1316,48 @@ function manipulateGraph(func) {
       errorG = result.error
       convexScaledG = scaled;
       convexFlippedG = flipped
+      gLeft = calculateLeastIncreasing(convexScaledG);
+      gRight = calculateLeastDecreasing(convexScaledG);
+
     }
  
+    // Calculations with both f and g
+    if (F.length > 0 && G.length > 0){
+      
+      // min/max
+      for (let i = 0; i < convexFlippedF.length; i++) {
+        const fPoint = convexFlippedF[i];
+        const gPoint = convexFlippedG[i];
+        if (!fPoint || !gPoint) continue;
+        
+        const x = fPoint[0];
+        const minY = Math.min(fPoint[1], gPoint[1]);
+        const maxY = Math.max(fPoint[1], gPoint[1]);
+        minPoints.push([x, minY]);
+        maxPoints.push([x, maxY]);
+      }
+
+      // unflipped min/max
+      unflippedMin = flipVertically(minPoints)
+      unflippedMax = flipVertically(maxPoints)
+
+      // union/intersection
+      pointwiseMax = convexScaledF.map(([x, y1], i) => {
+        const [, y2] = convexScaledG[i];
+        return [x, Math.max(y1, y2)];
+      });
+    
+      pointwiseMin = convexScaledF.map(([x, y1], i) => {
+        const [, y2] = convexScaledG[i];
+        return [x, Math.min(y1, y2)];
+      });
+
+      // join/meet
+      join = calculateJoin(pointwiseMax, fLeft, gLeft);
+      meet = calculateMeet(pointwiseMax, fRight, gRight);
+    }
+    
+    
     // redraw canvas
     updateTable();
     redrawCanvas();
@@ -1350,11 +1377,12 @@ function manipulateGraph(func) {
 function updateTable() {
   tableBody.innerHTML = ''; // Clear previous table
 
+  // x = 0, 0.01, ..., 1
   for (let i = 0; i <= 100; i++) {
     const x = (i / 100).toFixed(2);
     const row = document.createElement("tr");
 
-    // Add x value cell
+    // x val
     const xCell = document.createElement("td");
     xCell.textContent = x;
     row.appendChild(xCell);
@@ -1392,40 +1420,46 @@ function updateTable() {
     row.appendChild(addYCell(cff));
     row.appendChild(addYCell(cfg));
 
-    // Calculate min and max of flipped functions
-    const minCell = document.createElement("td");
-    const maxCell = document.createElement("td");
+    // Min/max flipped
+    const min =  minPoints[i]
+    const max =  maxPoints[i]
+    console.log(minPoints[i]);
+    row.appendChild(addYCell(min));
+    row.appendChild(addYCell(max));
+
+    // Min/max unflipped
+    const uMin =  unflippedMin[i]
+    const uMax =  unflippedMax[i]
+    console.log(minPoints[i]);
+    row.appendChild(addYCell(uMin));
+    row.appendChild(addYCell(uMax));
+
+    // union/intersection
+    const intersect =  pointwiseMin[i]
+    const union =  pointwiseMax[i]
+    row.appendChild(addYCell(intersect));
+    row.appendChild(addYCell(union));
     
-    // Extract y values from flipped functions
-    const getYValue = (point) => {
-      if (!point) return NaN;
-      let yValue;
 
-      if (point.y !== undefined) {
-        yValue = point.y;
-      } else if (Array.isArray(point)) {
-        yValue = point[1];
-      } else {
-        yValue = NaN;
-      }
+    // Least increasing/decreasing
+    const fL = fLeft[i]
+    const gL = gLeft[i]
+    const fR = fRight[i]
+    const gR = gRight[i]
+    row.appendChild(addYCell(fL));
+    row.appendChild(addYCell(gL));
+    row.appendChild(addYCell(fR));
+    row.appendChild(addYCell(gR));
 
-      return yValue;
 
-    };
+    // Join and meet
+    const myJoin = join[i];
+    const myMeet = meet[i];
+    row.appendChild(addYCell(myJoin));
+    row.appendChild(addYCell(myMeet));
 
-    const cffY = getYValue(cff);
-    const cfgY = getYValue(cfg);
 
-    if (!isNaN(cffY) && !isNaN(cfgY)) {
-      minCell.textContent = Math.min(cffY, cfgY).toFixed(2);
-      maxCell.textContent = Math.max(cffY, cfgY).toFixed(2);
-    } else {
-      minCell.textContent = "";
-      maxCell.textContent = "";
-    }
 
-    row.appendChild(minCell);
-    row.appendChild(maxCell);
 
     tableBody.appendChild(row);
   }
