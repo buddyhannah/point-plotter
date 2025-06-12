@@ -2,7 +2,6 @@ const canvas = document.getElementById('drawCanvas');
 const eqnLabel = document.getElementById('eqnLabel');
 const ctx = canvas.getContext('2d');
 const tableBody = document.getElementById('pointTableBody');
-const toggleBtn = document.getElementById('toggleFunction');
 const functionSelect = document.getElementById('functionSelect');
 
 // For drawing
@@ -19,7 +18,7 @@ let isPanning = false;
 let lastPanX = 0;
 let lastPanY = 0;
 const MAX_ZOOM = 5;
-const MIN_ZOOM = 0.5;
+const MIN_ZOOM = 0.25;
 
 // for toolbar scrolling
 const toolbar = document.querySelector('.toolbar');
@@ -38,7 +37,7 @@ const Y_SCALE_FACTOR = 2;
 const INITIAL_ZOOM = 2;  
 const FINAL_ZOOM = 1;   
 
-/** 'f', 'g', or 'h' */
+/** 'f' or 'g' */
 let currentFunc = 'f'; 
 
 
@@ -72,6 +71,7 @@ let gRight = [];
 let pointwiseMax = []
 let pointwiseMin = []
 
+// join/meet
 let join = []
 let meet = []
 
@@ -82,9 +82,10 @@ let unflippedMin = [];
 let unflippedMax = [];
 
 
+// colors and linestyles
 const gColors = {
   raw:        { color: 'rgb(255, 100, 0)',     linewidth: 1 },
-  main:       { color: 'rgba(255, 187, 160, 0.6)', linewidth: 2.5 },
+  main:       { color: 'rgba(255, 187, 160, 1)', linewidth: 2.5 },
   scaled:     { color: 'rgb(255, 190, 80)',    linewidth: 1 },
   scaledPeak: { color: 'rgb(180, 40, 0)', radius:2.5 },
   flipped:    { color: 'rgb(255, 150, 40)',    linewidth: 1 },
@@ -94,7 +95,7 @@ const gColors = {
 
 const fColors = {
   raw:        { color: 'rgb(0, 100, 180)',     linewidth: 1 },
-  main:       { color: 'rgba(150, 220, 255, 0.6)', linewidth: 2.5 },
+  main:       { color: 'rgba(150, 220, 255, 1)', linewidth: 2.5 },
   scaled:     { color: 'rgb(80, 200, 210)',    linewidth: 1 },
   scaledPeak: { color: 'rgb(0, 60, 120)', radius:2.5},
   flipped:    { color: 'rgb(40, 140, 220)',    linewidth: 1 },
@@ -113,7 +114,6 @@ const fgColors = {
   meet: { color: 'rgb(0, 95, 0)', linewidth: 3  }
 
 }
-
 
 
 // **************************************************
@@ -230,7 +230,6 @@ function drawGridLines() {
     ctx.lineTo(pixelX, canvas.height);
     ctx.stroke();
   }
-  
   
   // Horizontal gridlines every 0.1 units
   for (let y = 0; y <= Y_SCALE_FACTOR; y += 0.1) {
@@ -372,8 +371,7 @@ function zoomY(zoom_amount) {
 /**
  * Handles mouse movement during panning,
  * updating canvas offsets based on mouse delta
- * @param {MouseEvent} e - Mouse event
- * @note - called when the the user moves their mouse on the canvas
+ * @param {MouseEvent} e - Mouse event called when the the user moves their mouse on the canvas
  */
 function handlePanMove(e) {
   if (!isHandToolActive || !isPanning) return;
@@ -401,8 +399,8 @@ function handlePanMove(e) {
 /**
  * Starts panning operation, storing the mouse coordinates
  * for delta calculations and changing the cursor to 'grabbing'
- * @param {MouseEvent} e - Mouse event object
- * @note - called when user clicks and drags while in panning mode
+ * @param {MouseEvent} e - Mouse event called when user clicks 
+ * and drags while in panning mode
  */
 function handlePanStart(e) {
   if (!isHandToolActive) return;
@@ -421,7 +419,7 @@ function handlePanStart(e) {
 }
 
 /**
- *  Ends panning operation, setting isPanning to false
+ * Ends panning operation, setting isPanning to false
  * and changing the cursor to 'grab'
  */
 function handlePanEnd() {
@@ -430,7 +428,6 @@ function handlePanEnd() {
   isPanning = false;
   canvas.style.cursor = 'grab';
 }
-
 
 /**
  * Position the canvas to its inital state,
@@ -445,22 +442,9 @@ function resetView() {
   redrawCanvas();
 }
 
-
 // **************************************************
 // Handle Drawing
 // **************************************************
-
-
-
-// Function to switch between f and g
-function toggleFunction() {
-  currentFunc = currentFunc === 'f' ? 'g' : 'f';
-  drawing = false;
-  redrawCanvas();
-  
-  // Update UI to show which function is being drawn
-  toggleBtn.textContent = `Drawing: ${currentFunc.toUpperCase()}`;
-}
 
 /**
  * Checks if a point is within the bounds x ∈ [0,1] y ∈ [0,1]
@@ -475,7 +459,8 @@ function isPointInBounds(x, y) {
 
 /**
  * Starts a new drawing, clears points, and stores initial position.
- * @param {MouseEvent} e - Mouse Event
+ * @param {MouseEvent} e - Mouse Event called when the user
+ * clicks their mouse down
  */
 function startDraw(e) {
   if (isHandToolActive) return; // Don't draw when hand tool is active
@@ -489,6 +474,12 @@ function startDraw(e) {
   e.preventDefault();
 }
 
+/**
+ * Clears the specified graph, and all functions associated with it
+ * @param {String} label - name of the function to clear ('f' or 'g')
+ * @note  called on 'f' and 'g' when clear button is pressed, 
+ * or on the current function when starting a new drawing
+ */
 function clearFuncVars(label){
   if(label === 'f'){
     F = [];
@@ -522,12 +513,12 @@ function clearFuncVars(label){
 
 }
 
-/* 
-  Adds current mouse position to points array during drawing
-  Constructs F and G as [{x:x1, y:y1}, {x:x2, y:y2}, ...]
-  Input: 
-  e - Mouse event
-*/
+/**
+ * Adds the user's mouse position to the currently drawn function,
+ * populating the F or G  arrays with coordinates of the form 
+ * {x:x1, y:y1}, {x:x2: y:y2}, ...
+ * @param {MouseEvent} e - Mouse event called while the user is drawing
+ */
 function draw(e) {
   const pos = transformFromCanvas(e);
 
@@ -554,12 +545,11 @@ function draw(e) {
   e.preventDefault();
 }
 
-/*
-  Input: 
-  e - Mouse event 
-
-  Calls methods to process points and and compute the regression.
-*/
+/**
+ * Calls maniulateGraph on the newly drawn graph to process the points 
+ * and perform manipulations on the convex function
+ * @param {MouseEvent} e  - Mouse event called when the user stops drawing
+ */
 function endDraw(e) {
   drawing = false;
   
@@ -578,8 +568,13 @@ function endDraw(e) {
   e.preventDefault();
 }
 
-
-
+/**
+ * Draws a styled line through an array of [x, y] coordinates
+ * @param {Array<Array<number>>} points - List of coordinates in the form 
+ * [[0.01, y1], [0.02, y2], ... [1, 101]]
+ * @param {Object} style - Line style Object:
+ * { color: 'myColor', linewidth: Number, lineDash: [lineLength, gapLength] }
+ */
 function drawPath(points, style) {
   if (!points || points.length === 0) return;
   
@@ -602,7 +597,6 @@ function drawPath(points, style) {
   ctx.restore();
 }
 
-
 /**
  * Creates the control panel with graph visibility options
  */
@@ -610,16 +604,15 @@ function createControlPanel() {
   const existing = document.getElementById('graph-controls');
   if (existing) return;
 
-
   // Toggle button
   const toggleButton = document.createElement('button');
   toggleButton.id = 'control-toggle';
-  toggleButton.innerHTML = '&times;';
+  toggleButton.innerHTML = '&times;'; // Initial X icon
   toggleButton.style.position = 'absolute';
   toggleButton.style.zIndex = '1001';
   toggleButton.style.padding = '10px';
   toggleButton.style.borderRadius = '5px';
-  toggleButton.style.backgroundColor = '#2c3e50';
+  toggleButton.style.backgroundColor = '#2c3e50'; 
   toggleButton.style.color = 'white';
   toggleButton.style.border = 'none';
   toggleButton.style.cursor = 'pointer';
@@ -631,7 +624,6 @@ function createControlPanel() {
   // Panel container
   const controls = document.createElement('div');
   controls.id = 'graph-controls';
-  //controls.classList.add('collapsed');  // Initial state is collapsed
   document.body.appendChild(controls);
 
   // Title
@@ -648,7 +640,6 @@ function createControlPanel() {
     return group;
   };
 
-  
   const groups = [
     {
       heading: 'Original & Convex Approx.',
@@ -706,47 +697,37 @@ function createControlPanel() {
 
   toggleButton.addEventListener('click', () => {
     controls.classList.toggle('collapsed');
+    // Show hamburger icon when collapsed, X icon when expanded
     toggleButton.innerHTML = controls.classList.contains('collapsed') ? '&#9776;' : '&times;';
   });
   
 }
 
-
-/*
-  Draws the convex approximation with all check-marked graphs
-  @param {string} label - 'f' or 'g' to specify which function to draw
-*/
-function drawConvexApproximation() {
-
-  function drawFuncPoints(func, color){
-    ctx.fillStyle = color;
-    func.forEach(p => {
-      const screen = normalizedToScreen(p.x, p.y);
-      ctx.beginPath();
-      ctx.arc(screen.x, screen.y, 2, 0, 2 * Math.PI);
-      ctx.fill();
-    });
-  }
+/**
+ * Draws the check marked graphs
+ */
+function drawManipulatedGraphs() {
   
+  // Draw f
   if (document.getElementById('show-f')?.checked && F?.length && convexF?.length) {
-    drawFuncPoints(F, fColors.raw.color)
-    drawPoints(F, fColors.raw.color);
     drawPath(convexF, fColors.main);
+    drawFuncPoints(F, fColors.raw.color)
+    drawPath(F.map(point => [point.x, point.y]), fColors.raw);
   }
 
+  // Draw g
   if (document.getElementById('show-g')?.checked && G?.length && convexG?.length) {
-    drawFuncPoints(G, gColors.raw.color)
-    drawPoints(G, gColors.raw.color);
     drawPath(convexG, gColors.main);
+    drawFuncPoints(G, gColors.raw.color)
+    drawPath(G.map(point => [point.x, point.y]), gColors.raw);
   }
-
 
   // Scaled concave
   if (document.getElementById('show-convexF')?.checked && convexScaledF?.length) {
     drawPath(convexScaledF, fColors.scaled);
     drawPeakPoint(convexScaledF, peakIdxF, fColors.scaledPeak);
-    
   }
+
   if (document.getElementById('show-convexG')?.checked && convexScaledG?.length) {
     drawPath(convexScaledG, gColors.scaled);
     drawPeakPoint(convexScaledG, peakIdxG, gColors.scaledPeak);
@@ -756,11 +737,12 @@ function drawConvexApproximation() {
   if (document.getElementById('show-flippedF')?.checked && convexFlippedF?.length) {
     drawPath(convexFlippedF, fColors.flipped);
   }
+
   if (document.getElementById('show-flippedG')?.checked && convexFlippedG?.length) {
     drawPath(convexFlippedG, gColors.flipped);
   }
 
-  // Min/Max regions if flippedF and flippedF
+  // Min/Max regions if flippedF and flippedG
   if (convexFlippedF?.length && convexFlippedG?.length) {
     drawMinMaxRegions();
   }
@@ -768,10 +750,35 @@ function drawConvexApproximation() {
   // Pointwise operations 
   drawJoinMeet()
 
+  // Update equation label
   updateEquationLabel();
 }
+ 
+ /**
+ * Helper method for drawManipulatedGraphs to
+ * draw dots at each point of a functions
+ * @param {Array<{x: number, y: number}>} func - List of points 
+ * to plot (F or G)
+ * @param {string} color - Color of the dots
+ */
+ function drawFuncPoints(func, color){
+  ctx.fillStyle = color;
+  func.forEach(p => {
+    const screen = normalizedToScreen(p.x, p.y);
+    ctx.beginPath();
+    ctx.arc(screen.x, screen.y, 2, 0, 2 * Math.PI);
+    ctx.fill();
+  });
+}
 
-// Helper function to draw peak points
+/**
+ * Helper method for drawManipulatedGraphs to
+ * plot the peak point of a function
+ * @param {Array<Array<number>>} points - array or [x,y] coordinates
+ * @param {Number} peakIdx - index of the peak coordinate
+ * @param {Object} style - Dot style Object:
+ * { color: 'myColor', radius:Number }
+ */
 function drawPeakPoint(points, peakIdx, style) {
   if (!points?.[peakIdx]) return;
   
@@ -783,7 +790,11 @@ function drawPeakPoint(points, peakIdx, style) {
   ctx.fill();
 }
 
-
+/**
+ * Helper for drawManipulatedGraphs to draw 
+ * flipped & unflipped min/max graphs based on check marked
+ * functions.
+ */
 function drawMinMaxRegions() {
   const showMin = document.getElementById('show-flippedMin')?.checked;
   const showMax = document.getElementById('show-flippedMax')?.checked;
@@ -802,10 +813,14 @@ function drawMinMaxRegions() {
   if (showUnflippedMin){
     drawPath(unflippedMin, fgColors.minUnflipped)
   }
-
 }
 
-
+/**
+ * Helper for drawManipulatedGraphs to plot the 
+ * least increasing/decreasing functions for f and g, as
+ * well as the interesection, union, join, and meet of f and g, 
+ * based on the check marked functions
+ */
 function drawJoinMeet() {
   
   // Intersect/union
@@ -820,7 +835,7 @@ function drawJoinMeet() {
   }
 
   // Least increasing/decreasing
-  // f
+  // of f
   if(convexScaledF?.length){
     if (document.getElementById('show-fLeft')?.checked && fLeft.length) {
       drawPath(fLeft, fColors.left);
@@ -830,7 +845,8 @@ function drawJoinMeet() {
     }
     
   }
-  // g
+
+  // of g
   if(convexScaledG?.length){
 
     if (document.getElementById('show-gLeft')?.checked && gLeft.length) {
@@ -841,7 +857,6 @@ function drawJoinMeet() {
       drawPath(gRight, gColors.right);
     }
   }
-
 
   // join/meet
   if(convexScaledF?.length && convexScaledG?.length) {
@@ -857,11 +872,13 @@ function drawJoinMeet() {
 }
 
 
-
-function updateEquationLabel(value) {
+/**
+ * Updates the equation label with a information about 
+ * f(x) and g(x), including their line color, y-val of the
+ * convex peak, and the convex approximation error
+ */
+function updateEquationLabel() {
   let labelText = '';
-
-  labelText = `<div style="color: black;">`;  // Wrap all in a black-colored container
 
   if (F.length > 0) {
     labelText += `
@@ -945,11 +962,7 @@ function updateEquationLabel(value) {
         </span>
       </div>
     `;
-
   }
-
-
-  labelText += `</div>`; // Close the black color container
 
   eqnLabel.innerHTML = labelText;
 }
@@ -960,23 +973,18 @@ function updateEquationLabel(value) {
 // **************************************************
 
 
-/*
-  Given an array of x- and y-values, returns the monotonic
-  (non-decreasing or non-inceasing) array of y-values that best 
-  matches the original function using
-  the PAVA (Pool Adjacent Violators Algorithm) to for isotonic 
-  regression
- 
-  Input:
-  xVals - array of x-values (in increasing order)
-  yVals - array of y-values
-  increasing - true (default) for increasing regression, false for decreasing
-
-  Output:
-  Array of y-values representing the best monotonic fit
-
-  Time complexity: O(n)
-*/
+/**
+ * Given an array of x- and y-values, returns the monotonic
+ * (non-decreasing or non-inceasing) array of y-values that best 
+ * matches the original function using
+ * the PAVA (Pool Adjacent Violators Algorithm) to for isotonic 
+ * regression
+ * @param {Array<Array<number>>} xVals - array of x-values (in increasing order)
+ * @param {Array<Array<number>>} yVals - array of y-values
+ * @param {Boolean} increasing - true (default) for increasing regression, false for decreasing
+ * @returns array of y-values representing the best monotonic fit
+ * @note Time complexity is O(n) 
+ */
 function isotonicRegression(xVals, yVals, increasing = true) {
   const n = yVals.length;
   const y = yVals.slice();  
@@ -1024,11 +1032,11 @@ function isotonicRegression(xVals, yVals, increasing = true) {
 /**
  * Given x- and y-values, returns the best piecewise isotonic regression 
  * that is increasing to a peak, then decreasing.
- * @param {array} points - array of coordinates 
- * of form [[x:0.01, y:y1], [x:0.02, y:y2], ... [x:1, y:101]]
+ * @param {Array<{x: number, y: number}>} points - array of coordinates 
+ * of form [{x:0.01, y:y1}, {x:0.02, y:y2}, ... {x:1, y:101}]
  * @returns  
     - fit: best convex fit, represented as an array of form
-      [[x:0.01, y:y1], [x:0.02, y:y2], ... [x:1, y:101]]
+      [[0.01, y1], [0.02, y2], ... [1, y101]]
     - peakIndex: index of the peak
     - error: total squared error of the best fit
    @note Time complexity is O(n^2)
@@ -1100,14 +1108,12 @@ function solveConvexRegression(points) {
 /**
  * Scales the points so the peak y-value is 1
  * @param {*} points - array of points of form
- * [[x:0.01, y:y1], [x:0.02, y:y2], ... [x:1, y:101]]
+ * [[0.01, y1], [0.02, y2], ... [1, y101]]
  * representig the convex approx.
  * @param {*} peakIndex - Index of the peak point of the graph
  * @returns scaled points of form 
- * [[x:0.01, y:y1], [x:0.02, y:y2], ... [x:1, y:101]] 
+ * [[0.01, y1], [0.02, y2], ... [1, y101]]
  *  where the peak y-value is 1
- * 
- * FIX ME!
  */
 function scalePeakOne(points, peakIndex) {
   const maxY = points[peakIndex][1]; // Get y-value at peak index
@@ -1147,8 +1153,6 @@ function flipVertically(points) {
   });
 }
 
-
-
 /**
  * Helper method for solveonvexRegression to
   calculate the squared error between the predicted and actual y-value
@@ -1161,7 +1165,11 @@ function calculateError(actual, predicted) {
 }
 
 
-
+/**
+ * 
+ * @param {*} points 
+ * @returns 
+ */
 function calculateLeastIncreasing(points) {
   const envelope = [];
   let currentMax = -Infinity;
@@ -1572,46 +1580,25 @@ function redrawCanvas() {
 
   // Draw convex approx
   if(!drawing && (F.length > 0 || G.length > 0)){
-    drawConvexApproximation();
+    drawManipulatedGraphs();
   }
 
   // Draw function f (blue)
   if(drawing){
     if (F.length > 0) {
-      drawPoints(F, fColors.raw.color);
+      const FPoints = F.map(point => [point.x, point.y]);
+      drawPath(FPoints, fColors.raw);
     }
     
     // Draw function g (orange)
     if (G.length > 0) {
-      drawPoints(G, gColors.raw.color);
+      const GPoints = G.map(point => [point.x, point.y]);
+      drawPath(GPoints, gColors.raw);
     }
   }
-  
 
   // Draw mouse coordinates (always in screen space)
   drawMouseCoordinates();
-}
-
-function drawPoints(func, color) {
-  if (!func || func.length === 0) return;
-  
-  ctx.save();
-  ctx.beginPath();
-  
-  // Start with first point
-  const firstScreen = normalizedToScreen(func[0].x, func[0].y);
-  ctx.moveTo(firstScreen.x, firstScreen.y);
-  
-  // Draw remaining points
-  for (let i = 1; i < func.length; i++) {
-      const screen = normalizedToScreen(func[i].x, func[i].y);
-      ctx.lineTo(screen.x, screen.y);
-  }
-  
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.restore();
 }
 
 // **************************************************
