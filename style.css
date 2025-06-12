@@ -399,23 +399,6 @@ input[type="number"]:focus {
     align-items: center;
     justify-content: center;
   }
-
-  .table-scroll-container {
-    mask-image: linear-gradient(
-      to right,
-      transparent 0%,
-      black 15px,
-      black calc(100% - 15px),
-      transparent 100%
-    );
-    -webkit-mask-image: linear-gradient(
-      to right,
-      transparent 0%,
-      black 15px,
-      black calc(100% - 15px),
-      transparent 100%
-    );
-  }
   
 }
 

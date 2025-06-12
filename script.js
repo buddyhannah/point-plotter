@@ -88,8 +88,8 @@ const gColors = {
   scaled:     { color: 'rgb(255, 190, 80)',    linewidth: 1 },
   scaledPeak: { color: 'rgb(180, 40, 0)', radius:2.5 },
   flipped:    { color: 'rgb(255, 150, 40)',    linewidth: 1 },
-  left:  { color: 'rgb(151, 2, 94)',    linewidth: 1 },
-  right:  { color: 'rgb(151, 2, 94)',    linewidth: 1 },
+  left:  { color: 'rgb(151, 2, 94)',    linewidth: 2 },
+  right:  { color: 'rgb(151, 2, 94)',    linewidth: 2 },
 };
 
 const fColors = {
@@ -98,19 +98,19 @@ const fColors = {
   scaled:     { color: 'rgb(80, 200, 210)',    linewidth: 1 },
   scaledPeak: { color: 'rgb(0, 60, 120)', radius:2.5},
   flipped:    { color: 'rgb(40, 140, 220)',    linewidth: 1 },
-  left:  { color: 'rgb(67, 46, 255)',    linewidth: 1 },
-  right:  { color: 'rgb(67, 46, 255)',    linewidth: 1 },
+  left:  { color: 'rgb(67, 46, 255)',    linewidth: 2 },
+  right:  { color: 'rgb(67, 46, 255)',    linewidth: 2 },
 };
 
 const fgColors = {
-  minFlipped:   { color: 'rgb(0,255,0)', linewidth: 3, lineDash: [3, 5] },
-  maxFlipped:   { color: 'rgb(255,0,255)', linewidth: 3, lineDash: [3, 5] },
-  minUnflipped:   { color: 'rgb(0, 95, 0)', linewidth: 3, lineDash: [2, 2] },
-  maxUnflipped:   { color: 'rgb(158, 3, 158)', linewidth: 3, lineDash: [2, 2] },
-  union:  { color: 'rgb(26,188,156)', linewidth: 5, lineDash: [2, 4] },
-  intersect:  { color: 'rgb(231,76,60)', linewidth: 5, lineDash: [2, 4] },
-  join:  { color: 'rgb(255, 0, 140)', linewidth: 3 },
-  meet: { color: 'rgb(2, 51, 2)', linewidth: 3 }
+  minFlipped:   { color: 'rgb(0,255,0)', linewidth: 5, lineDash: [3, 5] },
+  maxFlipped:   { color: 'rgb(255,0,255)', linewidth: 5, lineDash: [3, 5] },
+  minUnflipped:   { color: 'rgb(1, 68, 1)', linewidth: 5, lineDash: [1, 2] },
+  maxUnflipped:   { color: 'rgb(119, 3, 119)', linewidth: 5, lineDash: [1, 2] },
+  union:  { color: 'rgb(26,188,156)', linewidth: 5, lineDash: [3, 5] },
+  intersect:  { color: 'rgb(231,76,60)', linewidth: 5, lineDash: [3, 5] },
+  join:  { color: 'rgb(158, 3, 158)', linewidth: 3 },
+  meet: { color: 'rgb(0, 95, 0)', linewidth: 3  }
 
 }
 
@@ -496,13 +496,29 @@ function clearFuncVars(label){
     convexScaledF = []
     convexFlippedF = [];
     peakIdxF = null;
+    errorF = null;
+    fLeft = [];
+    fRight = [];
   }else{
     G = [];
     convexG = [];
     convexScaledG = []
     convexFlippedG = [];
     peakIdxG = null;
+    errorG = null;
+    gLeft = [];
+    gRight = [];
   }
+
+  // f and g vars.
+  pointwiseMax = []
+  pointwiseMin = []
+  join = []
+  meet = []
+  minPoints = [];
+  maxPoints= [];
+  unflippedMin = [];
+  unflippedMax = [];
 
 }
 
@@ -546,7 +562,14 @@ function draw(e) {
 */
 function endDraw(e) {
   drawing = false;
-  // Process points and generate table
+  
+  const points = currentFunc === 'f' ? F : G;
+  if (points.length < 3) {
+    eqnLabel.textContent = "Need at least 3 points for " + currentFunc;
+    return;
+  }
+
+  // Process points
   if (currentFunc === 'f' && F.length > 0) {
     manipulateGraph('f');
   } else if (currentFunc === 'g' && G.length > 0) {
@@ -592,8 +615,6 @@ function createControlPanel() {
   const toggleButton = document.createElement('button');
   toggleButton.id = 'control-toggle';
   toggleButton.innerHTML = '&#9776;';
-  
-
   toggleButton.style.position = 'absolute';
   toggleButton.style.zIndex = '1001';
   toggleButton.style.padding = '10px';
@@ -622,7 +643,7 @@ function createControlPanel() {
   const createGroup = (heading) => {
     const group = document.createElement('div');
     const groupTitle = document.createElement('h4');
-    groupTitle.textContent = heading;
+    groupTitle.innerHTML = heading;
     group.appendChild(groupTitle);
     return group;
   };
@@ -630,7 +651,7 @@ function createControlPanel() {
   
   const groups = [
     {
-      heading: 'Original & Convexified Sets',
+      heading: 'Original & Convex Approx.',
       options: [
         { id: 'show-f', label: 'f' },
         { id: 'show-g', label: 'g' },
@@ -639,39 +660,29 @@ function createControlPanel() {
       ]
     },
     {
-      heading: 'Flipped Min/Max and Their Unflips',
+      heading: 'Join & Meet Algorithm 1',
       options: [
         { id: 'show-flippedF', label: 'f<sub>c</sub><sup>Flip</sup>' },
         { id: 'show-flippedG', label: 'g<sub>c</sub><sup>Flip</sup>' },
         { id: 'show-flippedMin', label: 'min{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}' },
         { id: 'show-flippedMax', label: 'max{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}' },
-        { id: 'show-unflippedMin', label: 'min{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}<sup>Unflip</sup>' },
-        { id: 'show-unflippedMax', label: 'max{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}<sup>Unflip</sup>' }
+        { id: 'show-unflippedMax', label: 'f<sub>c</sub> ⊔ g<sub>c</sub> = max{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}<sup>Unflip</sup>' },
+        { id: 'show-unflippedMin', label: 'f<sub>c</sub> ⊓ g<sub>c</sub> = min{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}<sup>Unflip</sup>' },
       
       ]
 
     },
     {
-      heading: 'Union & Intersection',
+      heading: 'Join & Meet Algorithm 2 ',
       options: [
-        { id: 'show-pwIntersect', label: 'f ∧ g' },
-        { id: 'show-pwUnion', label: 'f ∨ g' },
-      ]
-    },
-    {
-      heading: 'Least Monotonic Functions',
-      options: [
-        { id: 'show-fLeft', label: 'f<sup>L</sup>' },
-        { id: 'show-gLeft', label: 'g<sup>L</sup>' },
-        { id: 'show-fRight', label: 'f<sup>R</sup>' },
-        { id: 'show-gRight', label: 'g<sup>R</sup>' }
-      ]
-    },
-    {
-      heading: 'Join & Meet',
-      options: [
-        { id: 'show-join', label: 'f ⊔ g' },
-        { id: 'show-meet', label: 'f ⊓ g' }
+        { id: 'show-pwIntersect', label: 'f<sub>c</sub> ∧ g<sub>c</sub>' },
+        { id: 'show-pwUnion', label: 'f<sub>c</sub> ∨ g<sub>c</sub>' },
+        { id: 'show-fLeft', label: 'f<sub>c</sub><sup>L</sup>' },
+        { id: 'show-gLeft', label: 'g<sub>c</sub><sup>L</sup>' },
+        { id: 'show-fRight', label: 'f<sub>c</sub><sup>R</sup>' },
+        { id: 'show-gRight', label: 'g<sub>c</sub><sup>R</sup>' },
+        { id: 'show-join', label: 'f<sub>c</sub> ⊔ g<sub>c</sub> = (f<sub>c</sub> ∨ g<sub>c</sub>) ∧ (f<sub>c</sub><sup>L</sup> ∧ g<sub>c</sub><sup>L</sup>)' },
+        { id: 'show-meet', label: 'f<sub>c</sub> ⊓ g<sub>c</sub> = (f<sub>c</sub> ∨ g<sub>c</sub>) ∧ (f<sub>c</sub><sup>R</sup> ∧ g<sub>c</sub><sup>R</sup>)' }
       ]
     }
   ];
@@ -784,29 +795,42 @@ function drawMinMaxRegions() {
   if (showMin) drawPath(minPoints, fgColors.minFlipped);
   if (showMax) drawPath(maxPoints, fgColors.maxFlipped);
 
+  if (showUnflippedMax){
+    drawPath(unflippedMax, fgColors.maxUnflipped)
+  }
+
   if (showUnflippedMin){
     drawPath(unflippedMin, fgColors.minUnflipped)
   }
 
-  if (showUnflippedMax){
-    drawPath(unflippedMax, fgColors.maxUnflipped)
-  }
 }
 
 
 function drawJoinMeet() {
-  // Calculate all needed operations
+  
+  // Intersect/union
+  if(convexScaledF?.length && convexScaledG?.length) {
+    if (document.getElementById('show-pwIntersect')?.checked) {
+      drawPath(pointwiseMin, fgColors.intersect);
+    }
+    if (document.getElementById('show-pwUnion')?.checked) {
+      drawPath(pointwiseMax, fgColors.union);
+    }
+   
+  }
+
+  // Least increasing/decreasing
+  // f
   if(convexScaledF?.length){
     if (document.getElementById('show-fLeft')?.checked && fLeft.length) {
       drawPath(fLeft, fColors.left);
     }         
-    
     if (document.getElementById('show-fRight')?.checked && fRight.length) {
       drawPath(fRight, fColors.right);
     }
     
   }
- 
+  // g
   if(convexScaledG?.length){
 
     if (document.getElementById('show-gLeft')?.checked && gLeft.length) {
@@ -818,25 +842,18 @@ function drawJoinMeet() {
     }
   }
 
-  
-  // Return unless both f and g are populated
-  if(!(convexScaledF?.length && convexScaledG?.length)) {return;}
 
-  if (document.getElementById('show-pwUnion')?.checked) {
-    drawPath(pointwiseMax, fgColors.union);
-  }
-  if (document.getElementById('show-pwIntersect')?.checked) {
-    drawPath(pointwiseMin, fgColors.intersect);
-  }
+  // join/meet
+  if(convexScaledF?.length && convexScaledG?.length) {
+    if (document.getElementById('show-join')?.checked && fLeft.length && gLeft.length) {
+      drawPath(join, fgColors.join);
+    }
 
-  
-  if (document.getElementById('show-join')?.checked && fLeft.length && gLeft.length) {
-    drawPath(join, fgColors.join);
+    if (document.getElementById('show-meet')?.checked && fRight.length && gRight.length) {
+      drawPath(meet, fgColors.meet);
+    }
   }
 
-  if (document.getElementById('show-meet')?.checked && fRight.length && gRight.length) {
-    drawPath(meet, fgColors.meet);
-  }
 }
 
 
@@ -1285,20 +1302,13 @@ function calculateCombinedResults() {
 function manipulateGraph(func) {
   const points = func === 'f' ? [...F] : [...G];
 
-  if (points.length < 3) {
-    eqnLabel.textContent = "Need at least 3 points for " + func.label;
-    return;
-  }
-
   // Process function
   try {
     const processed = processPoints(points);
     const result = solveConvexRegression(processed);
     const scaled = scalePeakOne(result.fit, result.peakIndex)
-    console.log(scaled)
     const flipped = flipIncreasingPart(scaled,result.peakIndex)
-    console.log(flipped)
-
+ 
     if (func == 'f'){
       F = processed
       peakIdxF = result.peakIndex
@@ -1401,20 +1411,22 @@ function updateTable() {
   addHeaderIfChecked('show-g', 'g');
   addHeaderIfChecked('show-convexF', 'f<sub>c</sub>');
   addHeaderIfChecked('show-convexG', 'g<sub>c</sub>');
+  
   addHeaderIfChecked('show-flippedF', 'f<sub>c</sub><sup>Flip</sup>');
   addHeaderIfChecked('show-flippedG', 'g<sub>c</sub><sup>Flip</sup>');
   addHeaderIfChecked('show-flippedMin', 'min{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}');
   addHeaderIfChecked('show-flippedMax', 'max{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}');
-  addHeaderIfChecked('show-unflippedMin', 'min{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}<sup>Unflip</sup>');
-  addHeaderIfChecked('show-unflippedMax', 'max{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}<sup>Unflip</sup>');
-  addHeaderIfChecked('show-pwIntersect', 'f ∧ g = min{f, g}');
-  addHeaderIfChecked('show-pwUnion', 'f ∨ g = max{f, g}');
-  addHeaderIfChecked('show-fLeft', 'f<sup>L</sup> (least incr.)');
-  addHeaderIfChecked('show-gLeft', 'g<sup>L</sup> (least incr.)');
-  addHeaderIfChecked('show-fRight', 'f<sup>R</sup> (least decr.)');
-  addHeaderIfChecked('show-gRight', 'g<sup>R</sup> (least decr.)');
-  addHeaderIfChecked('show-join', 'f ⊔ g = (f ∨ g) ∧ (f<sup>L</sup> ∧ g<sup>L</sup>)');
-  addHeaderIfChecked('show-meet', 'f ⊓ g = (f ∨ g) ∧ (f<sup>R</sup> ∧ g<sup>R</sup>)');
+  addHeaderIfChecked('show-unflippedMax', 'f<sub>c</sub> ⊔ g<sub>c</sub> = max{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}<sup>Unflip</sup>');
+  addHeaderIfChecked('show-unflippedMin', 'f<sub>c</sub> ⊓ g<sub>c</sub> = min{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}<sup>Unflip</sup>');
+  
+  addHeaderIfChecked('show-pwIntersect', 'f<sub>c</sub> ∧ g<sub>c</sub> = min{f<sub>c</sub>, g<sub>c</sub>}');
+  addHeaderIfChecked('show-pwUnion', 'f<sub>c</sub> ∨ g<sub>c</sub> = max{f<sub>c</sub>, g<sub>c</sub>}');
+  addHeaderIfChecked('show-fLeft', 'f<sub>c</sub><sup>L</sup> (least incr.)');
+  addHeaderIfChecked('show-gLeft', 'g<sub>c</sub><sup>L</sup> (least incr.)');
+  addHeaderIfChecked('show-fRight', 'f<sub>c</sub><sup>R</sup> (least decr.)');
+  addHeaderIfChecked('show-gRight', 'g<sub>c</sub><sup>R</sup> (least decr.)');
+  addHeaderIfChecked('show-join', 'f<sub>c</sub> ⊔ g<sub>c</sub> = (f<sub>c</sub> ∨ g<sub>c</sub>) ∧ (f<sub>c</sub><sup>L</sup> ∧ g<sub>c</sub><sup>L</sup>)');
+  addHeaderIfChecked('show-meet', 'f<sub>c</sub> ⊓ g<sub>c</sub> = (f<sub>c</sub> ∨ g<sub>c</sub>) ∧ (f<sub>c</sub><sup>R</sup> ∧ g<sub>c</sub><sup>R</sup>)');
  
 
   // x = 0, 0.01, ..., 1
@@ -1451,12 +1463,14 @@ function updateTable() {
     if (checkedOptions['show-g']) row.appendChild(addYCell(G[i]));
     if (checkedOptions['show-convexF']) row.appendChild(addYCell(convexScaledF[i]));
     if (checkedOptions['show-convexG']) row.appendChild(addYCell(convexScaledG[i]));
+    
     if (checkedOptions['show-flippedF']) row.appendChild(addYCell(convexFlippedF[i]));
     if (checkedOptions['show-flippedG']) row.appendChild(addYCell(convexFlippedG[i]));
     if (checkedOptions['show-flippedMin']) row.appendChild(addYCell(minPoints[i]));
     if (checkedOptions['show-flippedMax']) row.appendChild(addYCell(maxPoints[i]));
-    if (checkedOptions['show-unflippedMin']) row.appendChild(addYCell(unflippedMin[i]));
     if (checkedOptions['show-unflippedMax']) row.appendChild(addYCell(unflippedMax[i]));
+    if (checkedOptions['show-unflippedMin']) row.appendChild(addYCell(unflippedMin[i]));
+    
     if (checkedOptions['show-pwIntersect']) row.appendChild(addYCell(pointwiseMin[i]));
     if (checkedOptions['show-pwUnion']) row.appendChild(addYCell(pointwiseMax[i]));
     if (checkedOptions['show-fLeft']) row.appendChild(addYCell(fLeft[i]));
@@ -1527,6 +1541,7 @@ function redrawCanvas() {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
 
   // Grey out non-editable areas of the canvas
   const topLeft = normalizedToScreen(0, 1);
@@ -1556,7 +1571,7 @@ function redrawCanvas() {
   
 
   // Draw convex approx
-  if(!drawing){
+  if(!drawing && (F.length > 0 || G.length > 0)){
     drawConvexApproximation();
   }
 
@@ -1577,28 +1592,26 @@ function redrawCanvas() {
   drawMouseCoordinates();
 }
 
-function drawPoints(func, color){
-
-    ctx.save();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    
-    // Start with first point
-    const firstPoint = func[0];
-    const firstScreen = normalizedToScreen(firstPoint.x, firstPoint.y);
-    ctx.moveTo(firstScreen.x, firstScreen.y);
-    
-    // Draw lines to all subsequent points
-    for (let i = 1; i < func.length; i++) {
-      const point = func[i];
-      const screen = normalizedToScreen(point.x, point.y);
-      ctx.lineTo(screen.x, screen.y);
-    }
-    
-    ctx.stroke();
-    ctx.restore();
+function drawPoints(func, color) {
+  if (!func || func.length === 0) return;
   
+  ctx.save();
+  ctx.beginPath();
+  
+  // Start with first point
+  const firstScreen = normalizedToScreen(func[0].x, func[0].y);
+  ctx.moveTo(firstScreen.x, firstScreen.y);
+  
+  // Draw remaining points
+  for (let i = 1; i < func.length; i++) {
+      const screen = normalizedToScreen(func[i].x, func[i].y);
+      ctx.lineTo(screen.x, screen.y);
+  }
+  
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.restore();
 }
 
 // **************************************************
