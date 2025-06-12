@@ -614,7 +614,7 @@ function createControlPanel() {
   // Toggle button
   const toggleButton = document.createElement('button');
   toggleButton.id = 'control-toggle';
-  toggleButton.innerHTML = '&#9776;';
+  toggleButton.innerHTML = '&times;';
   toggleButton.style.position = 'absolute';
   toggleButton.style.zIndex = '1001';
   toggleButton.style.padding = '10px';
@@ -631,7 +631,7 @@ function createControlPanel() {
   // Panel container
   const controls = document.createElement('div');
   controls.id = 'graph-controls';
-  controls.classList.add('collapsed');  // Initial state is collapsed
+  //controls.classList.add('collapsed');  // Initial state is collapsed
   document.body.appendChild(controls);
 
   // Title
