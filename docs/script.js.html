@@ -1,4 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: script.js</title>
 
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: script.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>
 // **************************************************
 // Global variables
 // **************************************************
@@ -33,7 +61,7 @@ const INITIAL_ZOOM = 2;
 const FINAL_ZOOM = 1;  
 const Y_SCALE_FACTOR = 2;  
 
-// *** for toolbar & table scrolling ***
+// *** for toolbar &amp; table scrolling ***
 let toolbarIsDown = false;
 let toolbarStartX = 0;
 let toolbarScrollLeft = 0;
@@ -75,7 +103,7 @@ let pointwiseMin = []
 let join = []
 let meet = []
 
-// *** min & max ***
+// *** min &amp; max ***
 let minPoints = [];
 let maxPoints= [];
 let unflippedMin = [];
@@ -224,7 +252,7 @@ function drawGridLines() {
   ctx.lineWidth = 0.5;
   
   // Vertical gridlines every 0.1 units
-  for (let x = 0; x <= 1; x += 0.1) {
+  for (let x = 0; x &lt;= 1; x += 0.1) {
     const pixelX = x * canvas.width;
     ctx.beginPath();
     ctx.moveTo(pixelX, 0);
@@ -233,7 +261,7 @@ function drawGridLines() {
   }
   
   // Horizontal gridlines every 0.1 units
-  for (let y = 0; y <= Y_SCALE_FACTOR; y += 0.1) {
+  for (let y = 0; y &lt;= Y_SCALE_FACTOR; y += 0.1) {
     const pixelY = (1 - y/Y_SCALE_FACTOR) * canvas.height;
     ctx.beginPath();
     ctx.moveTo(0, pixelY);
@@ -455,7 +483,7 @@ function resetView() {
  * and false otherwise
  */
 function isPointInBounds(x, y) {
-  return x >= 0 && x <= 1 && y >= 0 && y <= 1;
+  return x >= 0 &amp;&amp; x &lt;= 1 &amp;&amp; y >= 0 &amp;&amp; y &lt;= 1;
 }
 
 /**
@@ -555,15 +583,15 @@ function endDraw(e) {
   drawing = false;
   
   const points = currentFunc === 'f' ? F : G;
-  if (points.length < 3) {
+  if (points.length &lt; 3) {
     eqnLabel.textContent = "Need at least 3 points for " + currentFunc;
     return;
   }
 
   // Process points
-  if (currentFunc === 'f' && F.length > 0) {
+  if (currentFunc === 'f' &amp;&amp; F.length > 0) {
     manipulateGraph('f');
-  } else if (currentFunc === 'g' && G.length > 0) {
+  } else if (currentFunc === 'g' &amp;&amp; G.length > 0) {
     manipulateGraph('g');
   }
   e.preventDefault();
@@ -571,7 +599,7 @@ function endDraw(e) {
 
 /**
  * Draws a styled line through an array of [x, y] coordinates
- * @param {Array<Array<number>>} points - List of coordinates in the form 
+ * @param {Array&lt;Array&lt;number>>} points - List of coordinates in the form 
  * [[0.01, y1], [0.02, y2], ... [1, 101]]
  * @param {Object} style - Line style Object:
  * { color: 'myColor', linewidth: Number, lineDash: [lineLength, gapLength] }
@@ -589,7 +617,7 @@ function drawPath(points, style) {
   const start = normalizedToScreen(points[0][0], points[0][1]);
   ctx.moveTo(start.x, start.y);
   
-  for (let i = 1; i < points.length; i++) {
+  for (let i = 1; i &lt; points.length; i++) {
     const p = normalizedToScreen(points[i][0], points[i][1]);
     ctx.lineTo(p.x, p.y);
   }
@@ -608,7 +636,7 @@ function createControlPanel() {
   // Toggle button
   const toggleButton = document.createElement('button');
   toggleButton.id = 'control-toggle';
-  toggleButton.innerHTML = '&times;'; // Initial X icon
+  toggleButton.innerHTML = '&amp;times;'; // Initial X icon
   toggleButton.style.position = 'absolute';
   toggleButton.style.zIndex = '1001';
   toggleButton.style.padding = '10px';
@@ -643,38 +671,38 @@ function createControlPanel() {
 
   const groups = [
     {
-      heading: 'Original & Convex Approx.',
+      heading: 'Original &amp; Convex Approx.',
       options: [
         { id: 'show-f', label: 'f' },
         { id: 'show-g', label: 'g' },
-        { id: 'show-convexF', label: 'f<sub>c</sub>' },
-        { id: 'show-convexG', label: 'g<sub>c</sub>' },
+        { id: 'show-convexF', label: 'f&lt;sub>c&lt;/sub>' },
+        { id: 'show-convexG', label: 'g&lt;sub>c&lt;/sub>' },
       ]
     },
     {
-      heading: 'Join & Meet Algorithm 1',
+      heading: 'Join &amp; Meet Algorithm 1',
       options: [
-        { id: 'show-flippedF', label: 'f<sub>c</sub><sup>Flip</sup>' },
-        { id: 'show-flippedG', label: 'g<sub>c</sub><sup>Flip</sup>' },
-        { id: 'show-flippedMin', label: 'min{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}' },
-        { id: 'show-flippedMax', label: 'max{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}' },
-        { id: 'show-unflippedMax', label: 'f<sub>c</sub> ⊔ g<sub>c</sub> = max{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}<sup>Unflip</sup>' },
-        { id: 'show-unflippedMin', label: 'f<sub>c</sub> ⊓ g<sub>c</sub> = min{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}<sup>Unflip</sup>' },
+        { id: 'show-flippedF', label: 'f&lt;sub>c&lt;/sub>&lt;sup>Flip&lt;/sup>' },
+        { id: 'show-flippedG', label: 'g&lt;sub>c&lt;/sub>&lt;sup>Flip&lt;/sup>' },
+        { id: 'show-flippedMin', label: 'min{f&lt;sub>c&lt;/sub>&lt;sup>Flip&lt;/sup>, g&lt;sub>c&lt;/sub>&lt;sup>Flip&lt;/sup>}' },
+        { id: 'show-flippedMax', label: 'max{f&lt;sub>c&lt;/sub>&lt;sup>Flip&lt;/sup>, g&lt;sub>c&lt;/sub>&lt;sup>Flip&lt;/sup>}' },
+        { id: 'show-unflippedMax', label: 'f&lt;sub>c&lt;/sub> ⊔ g&lt;sub>c&lt;/sub> = max{f&lt;sub>c&lt;/sub>&lt;sup>Flip&lt;/sup>, g&lt;sub>c&lt;/sub>&lt;sup>Flip&lt;/sup>}&lt;sup>Unflip&lt;/sup>' },
+        { id: 'show-unflippedMin', label: 'f&lt;sub>c&lt;/sub> ⊓ g&lt;sub>c&lt;/sub> = min{f&lt;sub>c&lt;/sub>&lt;sup>Flip&lt;/sup>, g&lt;sub>c&lt;/sub>&lt;sup>Flip&lt;/sup>}&lt;sup>Unflip&lt;/sup>' },
       
       ]
 
     },
     {
-      heading: 'Join & Meet Algorithm 2 ',
+      heading: 'Join &amp; Meet Algorithm 2 ',
       options: [
-        { id: 'show-pwIntersect', label: 'f<sub>c</sub> ∧ g<sub>c</sub>' },
-        { id: 'show-pwUnion', label: 'f<sub>c</sub> ∨ g<sub>c</sub>' },
-        { id: 'show-fLeft', label: 'f<sub>c</sub><sup>L</sup>' },
-        { id: 'show-gLeft', label: 'g<sub>c</sub><sup>L</sup>' },
-        { id: 'show-fRight', label: 'f<sub>c</sub><sup>R</sup>' },
-        { id: 'show-gRight', label: 'g<sub>c</sub><sup>R</sup>' },
-        { id: 'show-join', label: 'f<sub>c</sub> ⊔ g<sub>c</sub> = (f<sub>c</sub> ∨ g<sub>c</sub>) ∧ (f<sub>c</sub><sup>L</sup> ∧ g<sub>c</sub><sup>L</sup>)' },
-        { id: 'show-meet', label: 'f<sub>c</sub> ⊓ g<sub>c</sub> = (f<sub>c</sub> ∨ g<sub>c</sub>) ∧ (f<sub>c</sub><sup>R</sup> ∧ g<sub>c</sub><sup>R</sup>)' }
+        { id: 'show-pwIntersect', label: 'f&lt;sub>c&lt;/sub> ∧ g&lt;sub>c&lt;/sub>' },
+        { id: 'show-pwUnion', label: 'f&lt;sub>c&lt;/sub> ∨ g&lt;sub>c&lt;/sub>' },
+        { id: 'show-fLeft', label: 'f&lt;sub>c&lt;/sub>&lt;sup>L&lt;/sup>' },
+        { id: 'show-gLeft', label: 'g&lt;sub>c&lt;/sub>&lt;sup>L&lt;/sup>' },
+        { id: 'show-fRight', label: 'f&lt;sub>c&lt;/sub>&lt;sup>R&lt;/sup>' },
+        { id: 'show-gRight', label: 'g&lt;sub>c&lt;/sub>&lt;sup>R&lt;/sup>' },
+        { id: 'show-join', label: 'f&lt;sub>c&lt;/sub> ⊔ g&lt;sub>c&lt;/sub> = (f&lt;sub>c&lt;/sub> ∨ g&lt;sub>c&lt;/sub>) ∧ (f&lt;sub>c&lt;/sub>&lt;sup>L&lt;/sup> ∧ g&lt;sub>c&lt;/sub>&lt;sup>L&lt;/sup>)' },
+        { id: 'show-meet', label: 'f&lt;sub>c&lt;/sub> ⊓ g&lt;sub>c&lt;/sub> = (f&lt;sub>c&lt;/sub> ∨ g&lt;sub>c&lt;/sub>) ∧ (f&lt;sub>c&lt;/sub>&lt;sup>R&lt;/sup> ∧ g&lt;sub>c&lt;/sub>&lt;sup>R&lt;/sup>)' }
       ]
     }
   ];
@@ -699,7 +727,7 @@ function createControlPanel() {
   toggleButton.addEventListener('click', () => {
     controls.classList.toggle('collapsed');
     // Show hamburger icon when collapsed, X icon when expanded
-    toggleButton.innerHTML = controls.classList.contains('collapsed') ? '&#9776;' : '&times;';
+    toggleButton.innerHTML = controls.classList.contains('collapsed') ? '&amp;#9776;' : '&amp;times;';
   });
   
 }
@@ -710,41 +738,41 @@ function createControlPanel() {
 function drawManipulatedGraphs() {
   
   // Draw f
-  if (document.getElementById('show-f')?.checked && F?.length && convexF?.length) {
+  if (document.getElementById('show-f')?.checked &amp;&amp; F?.length &amp;&amp; convexF?.length) {
     drawPath(convexF, fColors.main);
     drawFuncPoints(F, fColors.raw.color)
     drawPath(F.map(point => [point.x, point.y]), fColors.raw);
   }
 
   // Draw g
-  if (document.getElementById('show-g')?.checked && G?.length && convexG?.length) {
+  if (document.getElementById('show-g')?.checked &amp;&amp; G?.length &amp;&amp; convexG?.length) {
     drawPath(convexG, gColors.main);
     drawFuncPoints(G, gColors.raw.color)
     drawPath(G.map(point => [point.x, point.y]), gColors.raw);
   }
 
   // Scaled concave
-  if (document.getElementById('show-convexF')?.checked && convexScaledF?.length) {
+  if (document.getElementById('show-convexF')?.checked &amp;&amp; convexScaledF?.length) {
     drawPath(convexScaledF, fColors.scaled);
     drawPeakPoint(convexScaledF, peakIdxF, fColors.scaledPeak);
   }
 
-  if (document.getElementById('show-convexG')?.checked && convexScaledG?.length) {
+  if (document.getElementById('show-convexG')?.checked &amp;&amp; convexScaledG?.length) {
     drawPath(convexScaledG, gColors.scaled);
     drawPeakPoint(convexScaledG, peakIdxG, gColors.scaledPeak);
   }
 
   // Flipped scaled concave graph
-  if (document.getElementById('show-flippedF')?.checked && convexFlippedF?.length) {
+  if (document.getElementById('show-flippedF')?.checked &amp;&amp; convexFlippedF?.length) {
     drawPath(convexFlippedF, fColors.flipped);
   }
 
-  if (document.getElementById('show-flippedG')?.checked && convexFlippedG?.length) {
+  if (document.getElementById('show-flippedG')?.checked &amp;&amp; convexFlippedG?.length) {
     drawPath(convexFlippedG, gColors.flipped);
   }
 
   // Min/Max regions if flippedF and flippedG
-  if (convexFlippedF?.length && convexFlippedG?.length) {
+  if (convexFlippedF?.length &amp;&amp; convexFlippedG?.length) {
     drawMinMaxRegions();
   }
 
@@ -758,7 +786,7 @@ function drawManipulatedGraphs() {
  /**
  * Helper method for drawManipulatedGraphs to
  * draw dots at each point of a functions
- * @param {Array<{x: number, y: number}>} func - List of points 
+ * @param {Array&lt;{x: number, y: number}>} func - List of points 
  * to plot (F or G)
  * @param {string} color - Color of the dots
  */
@@ -775,7 +803,7 @@ function drawManipulatedGraphs() {
 /**
  * Helper method for drawManipulatedGraphs to
  * plot the peak point of a function
- * @param {Array.<Array.<number>>} points - array or [x,y] coordinates
+ * @param {Array.&lt;Array.&lt;number>>} points - array or [x,y] coordinates
  * @param {Number} peakIdx - index of the peak coordinate
  * @param {Object} style - Dot style Object:
  * { color: 'myColor', radius:Number }
@@ -793,7 +821,7 @@ function drawPeakPoint(points, peakIdx, style) {
 
 /**
  * Helper for drawManipulatedGraphs to draw 
- * flipped & unflipped min/max graphs based on check marked
+ * flipped &amp; unflipped min/max graphs based on check marked
  * functions.
  */
 function drawMinMaxRegions() {
@@ -802,7 +830,7 @@ function drawMinMaxRegions() {
   const showUnflippedMin = document.getElementById('show-unflippedMin')?.checked;
   const showUnflippedMax = document.getElementById('show-unflippedMax')?.checked;
 
-  if (!showMin && !showMax & !showUnflippedMin & !showUnflippedMax) return;
+  if (!showMin &amp;&amp; !showMax &amp; !showUnflippedMin &amp; !showUnflippedMax) return;
 
   if (showMin) drawPath(minPoints, fgColors.minFlipped);
   if (showMax) drawPath(maxPoints, fgColors.maxFlipped);
@@ -825,7 +853,7 @@ function drawMinMaxRegions() {
 function drawJoinMeet() {
   
   // Intersect/union
-  if(convexScaledF?.length && convexScaledG?.length) {
+  if(convexScaledF?.length &amp;&amp; convexScaledG?.length) {
     if (document.getElementById('show-pwIntersect')?.checked) {
       drawPath(pointwiseMin, fgColors.intersect);
     }
@@ -838,10 +866,10 @@ function drawJoinMeet() {
   // Least increasing/decreasing
   // of f
   if(convexScaledF?.length){
-    if (document.getElementById('show-fLeft')?.checked && fLeft.length) {
+    if (document.getElementById('show-fLeft')?.checked &amp;&amp; fLeft.length) {
       drawPath(fLeft, fColors.left);
     }         
-    if (document.getElementById('show-fRight')?.checked && fRight.length) {
+    if (document.getElementById('show-fRight')?.checked &amp;&amp; fRight.length) {
       drawPath(fRight, fColors.right);
     }
     
@@ -850,22 +878,22 @@ function drawJoinMeet() {
   // of g
   if(convexScaledG?.length){
 
-    if (document.getElementById('show-gLeft')?.checked && gLeft.length) {
+    if (document.getElementById('show-gLeft')?.checked &amp;&amp; gLeft.length) {
       drawPath(gLeft, gColors.left);
     }
   
-    if (document.getElementById('show-gRight')?.checked && gRight.length) {
+    if (document.getElementById('show-gRight')?.checked &amp;&amp; gRight.length) {
       drawPath(gRight, gColors.right);
     }
   }
 
   // join/meet
-  if(convexScaledF?.length && convexScaledG?.length) {
-    if (document.getElementById('show-join')?.checked && fLeft.length && gLeft.length) {
+  if(convexScaledF?.length &amp;&amp; convexScaledG?.length) {
+    if (document.getElementById('show-join')?.checked &amp;&amp; fLeft.length &amp;&amp; gLeft.length) {
       drawPath(join, fgColors.join);
     }
 
-    if (document.getElementById('show-meet')?.checked && fRight.length && gRight.length) {
+    if (document.getElementById('show-meet')?.checked &amp;&amp; fRight.length &amp;&amp; gRight.length) {
       drawPath(meet, fgColors.meet);
     }
   }
@@ -883,10 +911,10 @@ function updateEquationLabel() {
 
   if (F.length > 0) {
     labelText += `
-      <div>
-        <span style="position: relative; display: inline-block; padding: 0 6px; line-height: 1.2; border-bottom: ${fColors.raw.linewidth || 2}px solid ${fColors.raw.color};">
+      &lt;div>
+        &lt;span style="position: relative; display: inline-block; padding: 0 6px; line-height: 1.2; border-bottom: ${fColors.raw.linewidth || 2}px solid ${fColors.raw.color};">
           f(x)
-          <span style="
+          &lt;span style="
             position: absolute;
             bottom: 0; /* aligns with the bottom border */
             left: 50%;
@@ -896,29 +924,29 @@ function updateEquationLabel() {
             background-color: ${fColors.raw.color};
             border-radius: 50%;
             pointer-events: none;
-          "></span>
-        </span>
+          ">&lt;/span>
+        &lt;/span>
         |
-        <span style="border-bottom: ${fColors.scaled.linewidth || 2}px solid ${fColors.scaled.color}; padding: 2px;">
-          f(x)<sub>c</sub>
-        </span>
+        &lt;span style="border-bottom: ${fColors.scaled.linewidth || 2}px solid ${fColors.scaled.color}; padding: 2px;">
+          f(x)&lt;sub>c&lt;/sub>
+        &lt;/span>
         |
-        <span style="display: inline-flex; align-items: center;">
-          <span style="
+        &lt;span style="display: inline-flex; align-items: center;">
+          &lt;span style="
             display: inline-block;
             width: 10px;
             height: 10px;
             border-radius: 50%;
             background-color: ${fColors.scaledPeak.color};
             margin-right: 5px;
-          "></span>
+          ">&lt;/span>
           Convex Peak X: ${convexF?.[peakIdxF]?.[0]?.toFixed(2) ?? 'N/A'}
-        </span>
+        &lt;/span>
         |
-        <span>
+        &lt;span>
           Convex Error: ${errorF?.toFixed(4) ?? 'N/A'}
-        </span>
-      </div>
+        &lt;/span>
+      &lt;/div>
     `;
 
 
@@ -926,10 +954,10 @@ function updateEquationLabel() {
 
   if (G.length > 0) {
     labelText += `
-      <div>
-        <span style="position: relative; display: inline-block; padding: 0 6px; line-height: 1.2; border-bottom: ${gColors.raw.linewidth || 2}px solid ${gColors.raw.color};">
+      &lt;div>
+        &lt;span style="position: relative; display: inline-block; padding: 0 6px; line-height: 1.2; border-bottom: ${gColors.raw.linewidth || 2}px solid ${gColors.raw.color};">
           g(x)
-          <span style="
+          &lt;span style="
             position: absolute;
             bottom: 0; /* aligns with the bottom border */
             left: 50%;
@@ -939,29 +967,29 @@ function updateEquationLabel() {
             background-color: ${gColors.raw.color};
             border-radius: 50%;
             pointer-events: none;
-          "></span>
-        </span>
+          ">&lt;/span>
+        &lt;/span>
         |
-        <span style="border-bottom: ${gColors.scaled.linewidth || 2}px solid ${gColors.scaled.color}; padding: 2px;">
-          g(x)<sub>c</sub>
-        </span>
+        &lt;span style="border-bottom: ${gColors.scaled.linewidth || 2}px solid ${gColors.scaled.color}; padding: 2px;">
+          g(x)&lt;sub>c&lt;/sub>
+        &lt;/span>
         |
-        <span style="display: inline-flex; align-items: center;">
-          <span style="
+        &lt;span style="display: inline-flex; align-items: center;">
+          &lt;span style="
             display: inline-block;
             width: 10px;
             height: 10px;
             border-radius: 50%;
             background-color: ${gColors.scaledPeak.color};
             margin-right: 5px;
-          "></span>
+          ">&lt;/span>
           Convex Peak X: ${convexG?.[peakIdxG]?.[0]?.toFixed(2) ?? 'N/A'}
-        </span>
+        &lt;/span>
         |
-        <span>
+        &lt;span>
           Convex Error: ${errorG?.toFixed(4) ?? 'N/A'}
-        </span>
-      </div>
+        &lt;/span>
+      &lt;/div>
     `;
   }
 
@@ -980,10 +1008,10 @@ function updateEquationLabel() {
  * matches the original function using
  * the PAVA (Pool Adjacent Violators Algorithm) to for isotonic 
  * regression
- * @param {Array<number>} xVals - array of x-values (in increasing order)
- * @param {Array<number>} yVals - array of y-values
+ * @param {Array&lt;number>} xVals - array of x-values (in increasing order)
+ * @param {Array&lt;number>} yVals - array of y-values
  * @param {Boolean} increasing - true (default) for increasing regression, false for decreasing
- * @returns {Array<number>} array of y-values representing the best monotonic fit
+ * @returns {Array&lt;number>} array of y-values representing the best monotonic fit
  * @remarks Time complexity is O(n) 
  */
 function isotonicRegression(xVals, yVals, increasing = true) {
@@ -999,8 +1027,8 @@ function isotonicRegression(xVals, yVals, increasing = true) {
   let index = Array.from({ length: n }, (_, i) => [i, i]);
 
   let i = 0;
-  while (i < values.length - 1) {
-    const violation = increasing ? values[i] > values[i + 1] : values[i] < values[i + 1];
+  while (i &lt; values.length - 1) {
+    const violation = increasing ? values[i] > values[i + 1] : values[i] &lt; values[i + 1];
     if (violation) {
       // merge the two values by combine their weights
       // and replacing  both values with the weighted average
@@ -1020,8 +1048,8 @@ function isotonicRegression(xVals, yVals, increasing = true) {
   // Violations fixed
   // Assign the average value of each block to every original index in that block.
   const result = new Array(n);
-  for (let j = 0; j < values.length; j++) {
-    for (let k = index[j][0]; k <= index[j][1]; k++) {
+  for (let j = 0; j &lt; values.length; j++) {
+    for (let k = index[j][0]; k &lt;= index[j][1]; k++) {
       result[k] = values[j];
     }
   }
@@ -1033,9 +1061,9 @@ function isotonicRegression(xVals, yVals, increasing = true) {
 /**
  * Given x- and y-values, returns the best piecewise isotonic regression 
  * that is increasing to a peak, then decreasing.
- * @param {Array<{x: number, y: number}>} points - array of coordinates 
+ * @param {Array&lt;{x: number, y: number}>} points - array of coordinates 
  * of form [{x:0.01, y:y1}, {x:0.02, y:y2}, ... {x:1, y:101}]
- * @returns {{fit: Array.<Array.<number>>, peakIndex: number, error: number}}
+ * @returns {{fit: Array.&lt;Array.&lt;number>>, peakIndex: number, error: number}}
  * An object containing:
  * - fit: best convex fit, represented as an array of form
  *   [[0.01, y1], [0.02, y2], ... [1, y101]]
@@ -1048,14 +1076,14 @@ function solveConvexRegression(points) {
   const yValues = points.map(p => p.y);
   const n = xValues.length;
   
-  if (n < 3) return null;
+  if (n &lt; 3) return null;
 
   let bestError = Infinity;
   let bestFit = null;
   let bestPeakIndex = 0;
 
-  // For each 0 <= j <= n
-  for (let j = 1; j < n - 1; j++) {
+  // For each 0 &lt;= j &lt;= n
+  for (let j = 1; j &lt; n - 1; j++) {
 
     // Split into two regions around j
       // [0 ... j]
@@ -1107,7 +1135,7 @@ function solveConvexRegression(points) {
 
 /**
  * Scales the points so the peak y-value is 1
- * @param {Array.<Array.<number>>} points - array of points of form
+ * @param {Array.&lt;Array.&lt;number>>} points - array of points of form
  * [[0.01, y1], [0.02, y2], ... [1, y101]]
  * representig the convex approx.
  * @param {Number} peakIndex - Index of the peak point of the graph
@@ -1130,7 +1158,7 @@ function scalePeakOne(points, peakIndex) {
  * [[x:0.01, y:y1], [x:0.02, y:y2], ... [x:1, y:101]] representing the
  * convex approx.
  * @param {number} peakIndex - Index of the peak point
- * @returns {Array.<Array.<number>>} Array of  points representing the 
+ * @returns {Array.&lt;Array.&lt;number>>} Array of  points representing the 
  * convex approximation with the increasing part flipped
  * @remarks
  * Time complexity is O(n)
@@ -1138,7 +1166,7 @@ function scalePeakOne(points, peakIndex) {
 function flipIncreasingPart(f, peakIdx) {
   const peakY = f[peakIdx][1]; // y-value
   return f.map(([x, y], i) => {
-    if (i <= peakIdx) {
+    if (i &lt;= peakIdx) {
       return [x, 2 * peakY - y];
     }
     return [x, y];
@@ -1148,8 +1176,8 @@ function flipIncreasingPart(f, peakIdx) {
 
 /**
  * Flips the graph vertically (around y = 1) only for points where y > 1.
- * @param {Array.<Array.<number>>} points - Array of [x, y] points
- * @returns {Array.<Array.<number>>} The vertically flipped array of [x, y] points
+ * @param {Array.&lt;Array.&lt;number>>} points - Array of [x, y] points
+ * @returns {Array.&lt;Array.&lt;number>>} The vertically flipped array of [x, y] points
  * @remarks
  * Time complexity is O(n)
  */
@@ -1162,8 +1190,8 @@ function flipVertically(points) {
 /**
  * Helper method for solveConvexRegression to
  * calculate the squared error between the predicted and actual y-value
- * @param {Array<number>} actual - array of actual y-values
- * @param {Array<number>} predicted - array of predicted y-values
+ * @param {Array&lt;number>} actual - array of actual y-values
+ * @param {Array&lt;number>} predicted - array of predicted y-values
  * @returns {Number} the squared error between the predicted and actual y-value
  * @remarks
  * Time complexity is O(n)
@@ -1174,8 +1202,8 @@ function calculateError(actual, predicted) {
 
 /**
  * Computes the least increasing function above points
- * @param {Array.<Array.<number>>} points - Array of [x, y] coordinates
- * @returns {Array.<Array.<number>>} the least increasing function 
+ * @param {Array.&lt;Array.&lt;number>>} points - Array of [x, y] coordinates
+ * @returns {Array.&lt;Array.&lt;number>>} the least increasing function 
  */
 function calculateLeastIncreasing(points) {
   const envelope = [];
@@ -1190,8 +1218,8 @@ function calculateLeastIncreasing(points) {
 
 /**
  * Computes the least decreasing function above points
- * @param {Array.<Array.<number>>} points - Array of [x, y] coordinates
- * @returns {Array.<Array.<number>>} the least decreasing function 
+ * @param {Array.&lt;Array.&lt;number>>} points - Array of [x, y] coordinates
+ * @returns {Array.&lt;Array.&lt;number>>} the least decreasing function 
  */
 function calculateLeastDecreasing(points) {
   const envelope = [];
@@ -1207,10 +1235,10 @@ function calculateLeastDecreasing(points) {
 
 /**
  * Calculates f ⊔ g = (f ∨ g) ∧ (fL ∧ gL)
- * @param {Array.<Array.<number>>} union - pointwise max of f and g
- * @param {Array.<Array.<number>>} fLeft - least increasing function above f
- * @param {Array.<Array.<number>>} gLeft - least increasing function above g
- * @returns {Array.<Array.<number>>} The join of f and g
+ * @param {Array.&lt;Array.&lt;number>>} union - pointwise max of f and g
+ * @param {Array.&lt;Array.&lt;number>>} fLeft - least increasing function above f
+ * @param {Array.&lt;Array.&lt;number>>} gLeft - least increasing function above g
+ * @returns {Array.&lt;Array.&lt;number>>} The join of f and g
  */
 function calculateJoin(union, fLeft, gLeft, ) {
   
@@ -1225,10 +1253,10 @@ function calculateJoin(union, fLeft, gLeft, ) {
 
 /**
  * Calculates f ⊓ g = (f ∨ g) ∧ (fR ∧ gR)
- * @param {Array.<Array.<number>>} union - pointwise max of f and g
- * @param {Array.<Array.<number>>} fRight - least decreasing function above f
- * @param {Array.<Array.<number>>} gRight - least decreasing function above g
- * @returns {Array.<Array.<number>>} The meet of f and g
+ * @param {Array.&lt;Array.&lt;number>>} union - pointwise max of f and g
+ * @param {Array.&lt;Array.&lt;number>>} fRight - least decreasing function above f
+ * @param {Array.&lt;Array.&lt;number>>} gRight - least decreasing function above g
+ * @returns {Array.&lt;Array.&lt;number>>} The meet of f and g
  */
 function calculateMeet(union, fRight, gRight, ) {
 
@@ -1251,9 +1279,9 @@ function calculateMeet(union, fRight, gRight, ) {
  * Proceeses the drawing into a function with
  * 101 evenly spaced points, filling in missing 
  * values using linear interpolation. 
- * @param {Array<{x: number, y: number}>} points - Array of coordinates of form 
+ * @param {Array&lt;{x: number, y: number}>} points - Array of coordinates of form 
  * [{x:x1, y:y1}, {x:x1, y:y2}, ...]
- * @returns {Array<{x: number, y: number}>} an array of regularly spaced points of form
+ * @returns {Array&lt;{x: number, y: number}>} an array of regularly spaced points of form
  * [{x:0.01, y:y1}, {x:0.02, y:y2}, ... {x:1, y:101}]
  */
 function processPoints(points){
@@ -1266,10 +1294,10 @@ function processPoints(points){
   const processedPoints = [];
 
   // Create interpolated points at regular intervals
-  while (currentX <= 1.001 && pointIndex < points.length) {
+  while (currentX &lt;= 1.001 &amp;&amp; pointIndex &lt; points.length) {
     // Find the point closest to currentX
-    while (pointIndex < points.length - 1 && 
-          points[pointIndex + 1].x < currentX) {
+    while (pointIndex &lt; points.length - 1 &amp;&amp; 
+          points[pointIndex + 1].x &lt; currentX) {
       pointIndex++;
     }
     
@@ -1340,10 +1368,10 @@ function manipulateGraph(func) {
     }
  
     // Calculations with both f and g
-    if (convexFlippedF.length > 0 && convexFlippedG.length > 0){
+    if (convexFlippedF.length > 0 &amp;&amp; convexFlippedG.length > 0){
       
       // min/max
-      for (let i = 0; i < convexFlippedF.length; i++) {
+      for (let i = 0; i &lt; convexFlippedF.length; i++) {
         const fPoint = convexFlippedF[i];
         const gPoint = convexFlippedG[i];
         if (!fPoint || !gPoint) continue;
@@ -1400,7 +1428,7 @@ function updateTable() {
 
   // Create header row based on checked options
   const headerRow = document.querySelector('table thead tr');
-  headerRow.innerHTML = '<th>x</th>'; // Start with just x column
+  headerRow.innerHTML = '&lt;th>x&lt;/th>'; // Start with just x column
 
   // Helper function to add header if option is checked
   const addHeaderIfChecked = (id, headerHtml) => {
@@ -1414,27 +1442,27 @@ function updateTable() {
   // Add headers for each possible column
   addHeaderIfChecked('show-f', 'f');
   addHeaderIfChecked('show-g', 'g');
-  addHeaderIfChecked('show-convexF', 'f<sub>c</sub>');
-  addHeaderIfChecked('show-convexG', 'g<sub>c</sub>');
+  addHeaderIfChecked('show-convexF', 'f&lt;sub>c&lt;/sub>');
+  addHeaderIfChecked('show-convexG', 'g&lt;sub>c&lt;/sub>');
   
-  addHeaderIfChecked('show-flippedF', 'f<sub>c</sub><sup>Flip</sup>');
-  addHeaderIfChecked('show-flippedG', 'g<sub>c</sub><sup>Flip</sup>');
-  addHeaderIfChecked('show-flippedMin', 'min{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}');
-  addHeaderIfChecked('show-flippedMax', 'max{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}');
-  addHeaderIfChecked('show-unflippedMax', 'f<sub>c</sub> ⊔ g<sub>c</sub> = max{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}<sup>Unflip</sup>');
-  addHeaderIfChecked('show-unflippedMin', 'f<sub>c</sub> ⊓ g<sub>c</sub> = min{f<sub>c</sub><sup>Flip</sup>, g<sub>c</sub><sup>Flip</sup>}<sup>Unflip</sup>');
+  addHeaderIfChecked('show-flippedF', 'f&lt;sub>c&lt;/sub>&lt;sup>Flip&lt;/sup>');
+  addHeaderIfChecked('show-flippedG', 'g&lt;sub>c&lt;/sub>&lt;sup>Flip&lt;/sup>');
+  addHeaderIfChecked('show-flippedMin', 'min{f&lt;sub>c&lt;/sub>&lt;sup>Flip&lt;/sup>, g&lt;sub>c&lt;/sub>&lt;sup>Flip&lt;/sup>}');
+  addHeaderIfChecked('show-flippedMax', 'max{f&lt;sub>c&lt;/sub>&lt;sup>Flip&lt;/sup>, g&lt;sub>c&lt;/sub>&lt;sup>Flip&lt;/sup>}');
+  addHeaderIfChecked('show-unflippedMax', 'f&lt;sub>c&lt;/sub> ⊔ g&lt;sub>c&lt;/sub> = max{f&lt;sub>c&lt;/sub>&lt;sup>Flip&lt;/sup>, g&lt;sub>c&lt;/sub>&lt;sup>Flip&lt;/sup>}&lt;sup>Unflip&lt;/sup>');
+  addHeaderIfChecked('show-unflippedMin', 'f&lt;sub>c&lt;/sub> ⊓ g&lt;sub>c&lt;/sub> = min{f&lt;sub>c&lt;/sub>&lt;sup>Flip&lt;/sup>, g&lt;sub>c&lt;/sub>&lt;sup>Flip&lt;/sup>}&lt;sup>Unflip&lt;/sup>');
   
-  addHeaderIfChecked('show-pwIntersect', 'f<sub>c</sub> ∧ g<sub>c</sub> = min{f<sub>c</sub>, g<sub>c</sub>}');
-  addHeaderIfChecked('show-pwUnion', 'f<sub>c</sub> ∨ g<sub>c</sub> = max{f<sub>c</sub>, g<sub>c</sub>}');
-  addHeaderIfChecked('show-fLeft', 'f<sub>c</sub><sup>L</sup> (least incr.)');
-  addHeaderIfChecked('show-gLeft', 'g<sub>c</sub><sup>L</sup> (least incr.)');
-  addHeaderIfChecked('show-fRight', 'f<sub>c</sub><sup>R</sup> (least decr.)');
-  addHeaderIfChecked('show-gRight', 'g<sub>c</sub><sup>R</sup> (least decr.)');
-  addHeaderIfChecked('show-join', 'f<sub>c</sub> ⊔ g<sub>c</sub> = (f<sub>c</sub> ∨ g<sub>c</sub>) ∧ (f<sub>c</sub><sup>L</sup> ∧ g<sub>c</sub><sup>L</sup>)');
-  addHeaderIfChecked('show-meet', 'f<sub>c</sub> ⊓ g<sub>c</sub> = (f<sub>c</sub> ∨ g<sub>c</sub>) ∧ (f<sub>c</sub><sup>R</sup> ∧ g<sub>c</sub><sup>R</sup>)');
+  addHeaderIfChecked('show-pwIntersect', 'f&lt;sub>c&lt;/sub> ∧ g&lt;sub>c&lt;/sub> = min{f&lt;sub>c&lt;/sub>, g&lt;sub>c&lt;/sub>}');
+  addHeaderIfChecked('show-pwUnion', 'f&lt;sub>c&lt;/sub> ∨ g&lt;sub>c&lt;/sub> = max{f&lt;sub>c&lt;/sub>, g&lt;sub>c&lt;/sub>}');
+  addHeaderIfChecked('show-fLeft', 'f&lt;sub>c&lt;/sub>&lt;sup>L&lt;/sup> (least incr.)');
+  addHeaderIfChecked('show-gLeft', 'g&lt;sub>c&lt;/sub>&lt;sup>L&lt;/sup> (least incr.)');
+  addHeaderIfChecked('show-fRight', 'f&lt;sub>c&lt;/sub>&lt;sup>R&lt;/sup> (least decr.)');
+  addHeaderIfChecked('show-gRight', 'g&lt;sub>c&lt;/sub>&lt;sup>R&lt;/sup> (least decr.)');
+  addHeaderIfChecked('show-join', 'f&lt;sub>c&lt;/sub> ⊔ g&lt;sub>c&lt;/sub> = (f&lt;sub>c&lt;/sub> ∨ g&lt;sub>c&lt;/sub>) ∧ (f&lt;sub>c&lt;/sub>&lt;sup>L&lt;/sup> ∧ g&lt;sub>c&lt;/sub>&lt;sup>L&lt;/sup>)');
+  addHeaderIfChecked('show-meet', 'f&lt;sub>c&lt;/sub> ⊓ g&lt;sub>c&lt;/sub> = (f&lt;sub>c&lt;/sub> ∨ g&lt;sub>c&lt;/sub>) ∧ (f&lt;sub>c&lt;/sub>&lt;sup>R&lt;/sup> ∧ g&lt;sub>c&lt;/sub>&lt;sup>R&lt;/sup>)');
 
   // x = 0, 0.01, ..., 1
-  for (let i = 0; i <= 100; i++) {
+  for (let i = 0; i &lt;= 100; i++) {
     const x = (i / 100).toFixed(2);
     const row = document.createElement("tr");
 
@@ -1454,7 +1482,7 @@ function updateTable() {
       // Handle both object {x,y} and array [x,y] formats
       if (point.y !== undefined) {
         td.textContent = point.y.toFixed(2);
-      } else if (Array.isArray(point) && point.length >= 2) {
+      } else if (Array.isArray(point) &amp;&amp; point.length >= 2) {
         td.textContent = point[1].toFixed(2);
       } else {
         td.textContent = "";
@@ -1501,13 +1529,13 @@ function drawMouseCoordinates() {
   
   // Determine position for label
   let labelX, labelY;
-  if (screenPos.x < canvas.width / 2) {
+  if (screenPos.x &lt; canvas.width / 2) {
     labelX = screenPos.x + 40;
   } else {
     labelX = screenPos.x - 100;
   }
   
-  if (screenPos.y < canvas.height / 2) {
+  if (screenPos.y &lt; canvas.height / 2) {
     labelY = screenPos.y + 20;
   } else {
     labelY = screenPos.y - 10;
@@ -1575,7 +1603,7 @@ function redrawCanvas() {
   drawAxes();
 
   // Draw convex approx
-  if(!drawing && (F.length > 0 || G.length > 0)){
+  if(!drawing &amp;&amp; (F.length > 0 || G.length > 0)){
     drawManipulatedGraphs();
   }
 
@@ -1644,7 +1672,7 @@ function handleTouchMove(e) {
   const x = touch.clientX - rect.left;
   const y = touch.clientY - rect.top;
 
-  if (isHandToolActive && isPanning) {
+  if (isHandToolActive &amp;&amp; isPanning) {
     offsetX += x - lastPanX;
     offsetY += y - lastPanY;
     lastPanX = x;
@@ -1663,7 +1691,7 @@ function handleTouchMove(e) {
  * @param {TouchEvent} e 
  */
 function handleTouchEnd(e) {
-  if (!isHandToolActive && !isPanning) {
+  if (!isHandToolActive &amp;&amp; !isPanning) {
     endDraw(new MouseEvent('mouseup', {}));
   }
   isPanning = false;
@@ -1716,7 +1744,7 @@ canvas.addEventListener('mouseenter', (e) => {
 
 
 
-// *** Toolbar & Table Scrolling ***
+// *** Toolbar &amp; Table Scrolling ***
 function addDragScrollEvents(container) {
   const state = {
     isDown: false,
@@ -1819,3 +1847,26 @@ setCanvasSize();
 resetView();
 
 
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#calculateError">calculateError</a></li><li><a href="global.html#calculateJoin">calculateJoin</a></li><li><a href="global.html#calculateLeastDecreasing">calculateLeastDecreasing</a></li><li><a href="global.html#calculateLeastIncreasing">calculateLeastIncreasing</a></li><li><a href="global.html#calculateMeet">calculateMeet</a></li><li><a href="global.html#clearFuncVars">clearFuncVars</a></li><li><a href="global.html#createControlPanel">createControlPanel</a></li><li><a href="global.html#draw">draw</a></li><li><a href="global.html#drawAxes">drawAxes</a></li><li><a href="global.html#drawFuncPoints">drawFuncPoints</a></li><li><a href="global.html#drawGridLines">drawGridLines</a></li><li><a href="global.html#drawJoinMeet">drawJoinMeet</a></li><li><a href="global.html#drawManipulatedGraphs">drawManipulatedGraphs</a></li><li><a href="global.html#drawMinMaxRegions">drawMinMaxRegions</a></li><li><a href="global.html#drawMouseCoordinates">drawMouseCoordinates</a></li><li><a href="global.html#drawPath">drawPath</a></li><li><a href="global.html#drawPeakPoint">drawPeakPoint</a></li><li><a href="global.html#endDraw">endDraw</a></li><li><a href="global.html#flipIncreasingPart">flipIncreasingPart</a></li><li><a href="global.html#flipVertically">flipVertically</a></li><li><a href="global.html#handlePanEnd">handlePanEnd</a></li><li><a href="global.html#handlePanMove">handlePanMove</a></li><li><a href="global.html#handlePanStart">handlePanStart</a></li><li><a href="global.html#handleTouchEnd">handleTouchEnd</a></li><li><a href="global.html#handleTouchMove">handleTouchMove</a></li><li><a href="global.html#handleTouchStart">handleTouchStart</a></li><li><a href="global.html#isPointInBounds">isPointInBounds</a></li><li><a href="global.html#isotonicRegression">isotonicRegression</a></li><li><a href="global.html#manipulateGraph">manipulateGraph</a></li><li><a href="global.html#normalizedToScreen">normalizedToScreen</a></li><li><a href="global.html#processPoints">processPoints</a></li><li><a href="global.html#redrawCanvas">redrawCanvas</a></li><li><a href="global.html#resetView">resetView</a></li><li><a href="global.html#resizeCanvasToMatchDisplaySize">resizeCanvasToMatchDisplaySize</a></li><li><a href="global.html#scalePeakOne">scalePeakOne</a></li><li><a href="global.html#screenToNormalized">screenToNormalized</a></li><li><a href="global.html#setCanvasSize">setCanvasSize</a></li><li><a href="global.html#solveConvexRegression">solveConvexRegression</a></li><li><a href="global.html#startDraw">startDraw</a></li><li><a href="global.html#toggleHandTool">toggleHandTool</a></li><li><a href="global.html#transformFromCanvas">transformFromCanvas</a></li><li><a href="global.html#updateEquationLabel">updateEquationLabel</a></li><li><a href="global.html#updateTable">updateTable</a></li><li><a href="global.html#zoomCanvas">zoomCanvas</a></li><li><a href="global.html#zoomY">zoomY</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Fri Jun 13 2025 14:53:52 GMT-0600 (Mountain Daylight Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
