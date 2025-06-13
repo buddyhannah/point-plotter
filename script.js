@@ -1,6 +1,6 @@
 /**
  *
- * @fileoverview Tool for drawing and manipulating convex normal functions.
+ * @fileoverview Allows for drawing and manipulating convex normal functions.
  * Results are plotted on the canvas and in the table.
  * @see {@link https://buddyhannah.github.io/point-plotter/} Project
  * @see {@link https://github.com/buddyhannah/point-plotter} GitHub Repository
