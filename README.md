@@ -1,7 +1,9 @@
 # Fuzzy Set Manipulations
 
-Tool for drawing and manipulating convex normal functions. Results are plotted on the canvas and in the table.
+Tool for drawing and manipulating convex normal functions.  
+Results are plotted both on the canvas and in the table.
 
-## Links
-Project at https://buddyhannah.github.io/point-plotter/
-Function descriptions at https://buddyhannah.github.io/point-plotter/docs
+##  Links
+
+- [Live Project](https://buddyhannah.github.io/point-plotter/)
+- [Function Documentation](https://buddyhannah.github.io/point-plotter/docs)
